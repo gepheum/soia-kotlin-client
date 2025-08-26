@@ -1,4 +1,4 @@
-package soia.internal.soia
+package soia
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -8,16 +8,12 @@ import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
 import okio.source
-import soia.JsonFlavor
-import soia.Serializer
-import soia.SerializerImpl
 import java.io.InputStream
 import java.io.OutputStream
 import java.time.Instant
 
 private fun decodeNumber(buffer: Buffer): Long {
-    val wire = buffer.readByte().toInt() and 0xFF
-    return when (wire) {
+    return when (val wire = buffer.readByte().toInt() and 0xFF) {
         in 0..231 -> wire.toLong()
         232 -> buffer.readShortLe().toLong() and 0xFFFF
         233 -> buffer.readIntLe().toLong() and 0xFFFFFFFFL
@@ -77,9 +73,9 @@ private object BoolSerializer : SerializerImpl<Boolean> {
 
     override fun fromJson(json: JsonElement): Boolean {
         val primitive = json.jsonPrimitive
-        return when {
-            primitive.content == "true" -> true
-            primitive.content == "false" -> false
+        return when (primitive.content) {
+            "true" -> true
+            "false" -> false
             else -> primitive.content.toIntOrNull() != 0
         }
     }
@@ -108,8 +104,7 @@ private object Int32Serializer : SerializerImpl<Int> {
                     }
                     else -> {
                         buffer.writeByte(237)
-                        val clampedValue = if (input >= -2147483648) input else -2147483648
-                        buffer.writeIntLe(clampedValue)
+                        buffer.writeIntLe(input)
                     }
                 }
             }
@@ -122,8 +117,7 @@ private object Int32Serializer : SerializerImpl<Int> {
             }
             else -> {
                 buffer.writeByte(233)
-                val clampedValue = if (input <= 2147483647) input else 2147483647
-                buffer.writeIntLe(clampedValue)
+                buffer.writeIntLe(input)
             }
         }
         buffer.copyTo(stream)

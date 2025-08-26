@@ -27,7 +27,7 @@ fun <M, E, K> toIndexedList(
     getKey: (E) -> K,
     toFrozen: (M) -> E,
 ): IndexedList<E, K> {
-    return if (elements is IndexedListImpl<*, *> && !elements.getKeySpec.isEmpty() && elements.getKey == getKey) {
+    return if (elements is IndexedListImpl<*, *> && elements.getKeySpec.isNotEmpty() && elements.getKey == getKey) {
         elements as IndexedList<E, K>
     } else {
         val result = IndexedListImpl(elements.map(toFrozen), getKeySpec, getKey)

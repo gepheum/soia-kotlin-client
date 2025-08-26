@@ -7,11 +7,6 @@ import okio.ByteString
 import java.io.InputStream
 import java.io.OutputStream
 
-private val jsonInstance = Json {
-    // TODO: rm
-    allowSpecialFloatingPointValues = true
-}
-
 enum class JsonFlavor {
     DENSE,
     READABLE,
@@ -34,12 +29,9 @@ class Serializer<T> internal constructor(
         val jsonElement = this.impl.toJson(input, flavor)
         return when (flavor) {
             JsonFlavor.DENSE ->
-                jsonInstance.encodeToString(JsonElement.serializer(), jsonElement)
+                Json.Default.encodeToString(JsonElement.serializer(), jsonElement)
             JsonFlavor.READABLE ->
-                Json {
-                    prettyPrint = true
-                    prettyPrintIndent = "  "
-                }.encodeToString(JsonElement.serializer(), jsonElement)
+                readableJson.encodeToString(JsonElement.serializer(), jsonElement)
         }
     }
 
@@ -48,7 +40,7 @@ class Serializer<T> internal constructor(
     }
 
     fun fromJsonCode(jsonCode: String): T {
-        val jsonElement = jsonInstance.decodeFromString(JsonElement.serializer(), jsonCode)
+        val jsonElement = Json.Default.decodeFromString(JsonElement.serializer(), jsonCode)
         return this.impl.fromJson(jsonElement)
     }
 
@@ -60,6 +52,14 @@ class Serializer<T> internal constructor(
 
     fun fromBytes(stream: InputStream): T {
         return this.impl.decode(stream)
+    }
+
+    companion object {
+        @OptIn(kotlinx. serialization. ExperimentalSerializationApi::class)
+        private val readableJson = Json {
+            prettyPrint = true
+            prettyPrintIndent = "  "
+        }
     }
 }
 
@@ -76,7 +76,7 @@ internal interface SerializerImpl<T> {
     fun encode(
         input: T,
         stream: OutputStream,
-    ): Unit
+    )
 
     fun decode(stream: InputStream): T
 }
