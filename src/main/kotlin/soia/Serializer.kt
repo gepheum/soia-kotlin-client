@@ -4,8 +4,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import okio.Buffer
 import okio.ByteString
-import java.io.InputStream
-import java.io.OutputStream
 
 enum class JsonFlavor {
     DENSE,
@@ -46,20 +44,42 @@ class Serializer<T> internal constructor(
 
     fun toBytes(input: T): ByteString {
         val buffer = Buffer()
-        this.impl.encode(input, buffer.outputStream())
+        buffer.writeUtf8("soia")
+        this.impl.encode(input, buffer)
         return buffer.readByteString()
     }
 
-    fun fromBytes(stream: InputStream): T {
-        return this.impl.decode(stream)
+    fun fromBytes(bytes: ByteArray): T {
+        val buffer = Buffer()
+        buffer.write(bytes)
+        return this.fromBytes(buffer)
+    }
+
+    fun fromBytes(bytes: ByteString): T {
+        val buffer = Buffer()
+        buffer.write(bytes)
+        return this.fromBytes(buffer)
+    }
+
+    private fun fromBytes(buffer: Buffer): T {
+        return if (buffer.readByte().toInt() == 's'.code &&
+            buffer.readByte().toInt() == 'o'.code &&
+            buffer.readByte().toInt() == 'i'.code &&
+            buffer.readByte().toInt() == 'a'.code
+        ) {
+            this.impl.decode(buffer)
+        } else {
+            this.fromJsonCode(buffer.readUtf8())
+        }
     }
 
     companion object {
-        @OptIn(kotlinx. serialization. ExperimentalSerializationApi::class)
-        private val readableJson = Json {
-            prettyPrint = true
-            prettyPrintIndent = "  "
-        }
+        @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+        private val readableJson =
+            Json {
+                prettyPrint = true
+                prettyPrintIndent = "  "
+            }
     }
 }
 
@@ -75,8 +95,8 @@ internal interface SerializerImpl<T> {
 
     fun encode(
         input: T,
-        stream: OutputStream,
+        buffer: Buffer,
     )
 
-    fun decode(stream: InputStream): T
+    fun decode(buffer: Buffer): T
 }

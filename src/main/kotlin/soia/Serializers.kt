@@ -1,44 +1,64 @@
+// TODO: throw exception when parsing bytes/JSON and invalid
+
 package soia
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.float
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
-import okio.source
-import java.io.InputStream
-import java.io.OutputStream
 import java.time.Instant
-
-private fun decodeNumber(buffer: Buffer): Long {
-    return when (val wire = buffer.readByte().toInt() and 0xFF) {
-        in 0..231 -> wire.toLong()
-        232 -> buffer.readShortLe().toLong() and 0xFFFF
-        233 -> buffer.readIntLe().toLong() and 0xFFFFFFFFL
-        234 -> buffer.readLongLe()
-        235 -> (buffer.readByte().toInt() and 0xFF) - 256L
-        236 -> (buffer.readShortLe().toInt() and 0xFFFF) - 65536L
-        237 -> buffer.readIntLe().toLong()
-        238 -> buffer.readLongLe()
-        239 -> buffer.readLongLe()
-        240 -> Float.fromBits(buffer.readIntLe()).toLong()
-        241 -> Double.fromBits(buffer.readLongLe()).toLong()
-        else -> wire.toLong()
-    }
-}
 
 object Serializers {
     val bool: Serializer<Boolean> = Serializer(BoolSerializer)
     val int32: Serializer<Int> = Serializer(Int32Serializer)
     val int64: Serializer<Long> = Serializer(Int64Serializer)
-    val uint64: Serializer<Long> = Serializer(Uint64Serializer)
+    val uint64: Serializer<ULong> = Serializer(Uint64Serializer)
     val float32: Serializer<Float> = Serializer(Float32Serializer)
     val float64: Serializer<Double> = Serializer(Float64Serializer)
     val string: Serializer<String> = Serializer(StringSerializer)
     val bytes: Serializer<ByteString> = Serializer(BytesSerializer)
     val timestamp: Serializer<Instant> = Serializer(TimestampSerializer)
+}
+
+private fun decodeNumber(buffer: Buffer): Number {
+    return when (val wire = buffer.readByte().toInt() and 0xFF) {
+        in 0..231 -> wire.toLong()
+        232 -> buffer.readShortLe().toInt() and 0xFFFF // uint16
+        233 -> buffer.readIntLe().toLong() and 0xFFFFFFFF // uint32
+        234 -> buffer.readLongLe() // uint64
+        235 -> (buffer.readByte().toInt() and 0xFF) - 256L
+        236 -> (buffer.readShortLe().toInt() and 0xFFFF) - 65536L
+        237 -> buffer.readIntLe()
+        238 -> buffer.readLongLe()
+        239 -> buffer.readLongLe()
+        240 -> Float.fromBits(buffer.readIntLe())
+        241 -> Double.fromBits(buffer.readLongLe())
+        else -> wire
+    }
+}
+
+private fun encodeLengthPrefix(
+    length: Int,
+    buffer: Buffer,
+) {
+    // Encode length using the same scheme as int32
+    when {
+        length < 232 -> buffer.writeByte(length)
+        length < 65536 -> {
+            buffer.writeByte(232)
+            buffer.writeShortLe(length)
+        }
+        else -> {
+            buffer.writeByte(233)
+            buffer.writeIntLe(length)
+        }
+    }
 }
 
 private object BoolSerializer : SerializerImpl<Boolean> {
@@ -48,16 +68,12 @@ private object BoolSerializer : SerializerImpl<Boolean> {
 
     override fun encode(
         input: Boolean,
-        stream: OutputStream,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
         buffer.writeByte(if (input) 1 else 0)
-        buffer.copyTo(stream)
     }
 
-    override fun decode(stream: InputStream): Boolean {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
+    override fun decode(buffer: Buffer): Boolean {
         return buffer.readByte() == 1.toByte()
     }
 
@@ -74,9 +90,9 @@ private object BoolSerializer : SerializerImpl<Boolean> {
     override fun fromJson(json: JsonElement): Boolean {
         val primitive = json.jsonPrimitive
         return when (primitive.content) {
-            "true" -> true
+            "0" -> false
             "false" -> false
-            else -> primitive.content.toIntOrNull() != 0
+            else -> true
         }
     }
 }
@@ -88,9 +104,8 @@ private object Int32Serializer : SerializerImpl<Int> {
 
     override fun encode(
         input: Int,
-        stream: OutputStream,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
         when {
             input < 0 -> {
                 when {
@@ -120,12 +135,9 @@ private object Int32Serializer : SerializerImpl<Int> {
                 buffer.writeIntLe(input)
             }
         }
-        buffer.copyTo(stream)
     }
 
-    override fun decode(stream: InputStream): Int {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
+    override fun decode(buffer: Buffer): Int {
         return decodeNumber(buffer).toInt()
     }
 
@@ -137,9 +149,12 @@ private object Int32Serializer : SerializerImpl<Int> {
     }
 
     override fun fromJson(json: JsonElement): Int {
-        return json.jsonPrimitive.content.toIntOrNull() ?: 0
+        return json.jsonPrimitive.content.toInt()
     }
 }
+
+private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740992; // -(2 ^ 53)
+private const val MAX_SAFE_JAVASCRIPT_INT = 9007199254740992; // -(2 ^ 53)
 
 private object Int64Serializer : SerializerImpl<Long> {
     override fun isDefault(value: Long): Boolean {
@@ -148,24 +163,29 @@ private object Int64Serializer : SerializerImpl<Long> {
 
     override fun encode(
         input: Long,
-        stream: OutputStream,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
-        buffer.writeLongLe(input)
-        buffer.copyTo(stream)
+        if (input in -2147483648..2147483647) {
+            Int32Serializer.encode(input.toInt(), buffer)
+        } else {
+            buffer.writeByte(238)
+            buffer.writeLongLe(input)
+        }
     }
 
-    override fun decode(stream: InputStream): Long {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
-        return buffer.readLongLe()
+    override fun decode(buffer: Buffer): Long {
+        return decodeNumber(buffer).toLong()
     }
 
     override fun toJson(
         input: Long,
         flavor: JsonFlavor,
     ): JsonElement {
-        return JsonPrimitive(input)
+        return if (input in MIN_SAFE_JAVASCRIPT_INT..MAX_SAFE_JAVASCRIPT_INT) {
+            JsonPrimitive(input)
+        } else {
+            JsonPrimitive("$input")
+        }
     }
 
     override fun fromJson(json: JsonElement): Long {
@@ -173,35 +193,52 @@ private object Int64Serializer : SerializerImpl<Long> {
     }
 }
 
-private object Uint64Serializer : SerializerImpl<Long> {
-    override fun isDefault(value: Long): Boolean {
-        return value == 0L
+private object Uint64Serializer : SerializerImpl<ULong> {
+    override fun isDefault(value: ULong): Boolean {
+        return value == 0UL
     }
 
     override fun encode(
-        input: Long,
-        stream: OutputStream,
+        input: ULong,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
-        buffer.writeLongLe(input)
-        buffer.copyTo(stream)
+        when {
+            input < 232UL -> {
+                buffer.writeByte(input.toInt())
+            }
+            input < 4294967296UL -> {
+                if (input < 65536UL) {
+                    buffer.writeByte(232)
+                    buffer.writeShortLe(input.toInt())
+                } else {
+                    buffer.writeByte(233)
+                    buffer.writeIntLe(input.toInt())
+                }
+            }
+            else -> {
+                buffer.writeByte(234)
+                buffer.writeLongLe(input.toLong())
+            }
+        }
     }
 
-    override fun decode(stream: InputStream): Long {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
-        return buffer.readLongLe()
+    override fun decode(buffer: Buffer): ULong {
+        return decodeNumber(buffer).toLong().toULong()
     }
 
     override fun toJson(
-        input: Long,
+        input: ULong,
         flavor: JsonFlavor,
     ): JsonElement {
-        return JsonPrimitive(input)
+        return if (input <= MAX_SAFE_JAVASCRIPT_INT.toULong()) {
+            JsonPrimitive(input.toLong())
+        } else {
+            JsonPrimitive("$input")
+        }
     }
 
-    override fun fromJson(json: JsonElement): Long {
-        return json.jsonPrimitive.content.toLong()
+    override fun fromJson(json: JsonElement): ULong {
+        return json.jsonPrimitive.content.toULong()
     }
 }
 
@@ -212,43 +249,37 @@ private object Float32Serializer : SerializerImpl<Float> {
 
     override fun encode(
         input: Float,
-        stream: OutputStream,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
         if (input == 0.0f) {
             buffer.writeByte(0)
         } else {
             buffer.writeByte(240)
             buffer.writeIntLe(input.toBits())
         }
-        buffer.copyTo(stream)
     }
 
-    override fun decode(stream: InputStream): Float {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
-        val wire = buffer.readByte().toInt() and 0xFF
-        return if (wire == 0) {
-            0.0f
-        } else {
-            Float.fromBits(buffer.readIntLe())
-        }
+    override fun decode(buffer: Buffer): Float {
+        return decodeNumber(buffer).toFloat()
     }
 
     override fun toJson(
         input: Float,
         flavor: JsonFlavor,
     ): JsonElement {
-        return JsonPrimitive(input)
+        return if (input.isFinite()) {
+            JsonPrimitive(input)
+        } else {
+            JsonPrimitive(input.toString())
+        }
     }
 
     override fun fromJson(json: JsonElement): Float {
         val primitive = json.jsonPrimitive
-        return when (primitive.content) {
-            "NaN" -> Float.NaN
-            "Infinity" -> Float.POSITIVE_INFINITY
-            "-Infinity" -> Float.NEGATIVE_INFINITY
-            else -> primitive.content.toFloatOrNull() ?: 0.0f
+        return if (primitive.isString) {
+            primitive.content.toFloat()
+        } else {
+            primitive.float
         }
     }
 }
@@ -260,43 +291,37 @@ private object Float64Serializer : SerializerImpl<Double> {
 
     override fun encode(
         input: Double,
-        stream: OutputStream,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
         if (input == 0.0) {
             buffer.writeByte(0)
         } else {
             buffer.writeByte(241)
             buffer.writeLongLe(input.toBits())
         }
-        buffer.copyTo(stream)
     }
 
-    override fun decode(stream: InputStream): Double {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
-        val wire = buffer.readByte().toInt() and 0xFF
-        return if (wire == 0) {
-            0.0
-        } else {
-            Double.fromBits(buffer.readLongLe())
-        }
+    override fun decode(buffer: Buffer): Double {
+        return decodeNumber(buffer).toDouble()
     }
 
     override fun toJson(
         input: Double,
         flavor: JsonFlavor,
     ): JsonElement {
-        return JsonPrimitive(input)
+        return if (input.isFinite()) {
+            JsonPrimitive(input)
+        } else {
+            JsonPrimitive(input.toString())
+        }
     }
 
     override fun fromJson(json: JsonElement): Double {
         val primitive = json.jsonPrimitive
-        return when (primitive.content) {
-            "NaN" -> Double.NaN
-            "Infinity" -> Double.POSITIVE_INFINITY
-            "-Infinity" -> Double.NEGATIVE_INFINITY
-            else -> primitive.content.toDoubleOrNull() ?: 0.0
+        return if (primitive.isString) {
+            primitive.content.toDouble()
+        } else {
+            primitive.double
         }
     }
 }
@@ -308,35 +333,20 @@ private object StringSerializer : SerializerImpl<String> {
 
     override fun encode(
         input: String,
-        stream: OutputStream,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
         if (input.isEmpty()) {
             buffer.writeByte(242)
         } else {
             buffer.writeByte(243)
             val bytes = input.toByteArray(Charsets.UTF_8)
             val length = bytes.size
-            // Encode length using the same scheme as int32
-            when {
-                length < 232 -> buffer.writeByte(length)
-                length < 65536 -> {
-                    buffer.writeByte(232)
-                    buffer.writeShortLe(length)
-                }
-                else -> {
-                    buffer.writeByte(233)
-                    buffer.writeIntLe(length)
-                }
-            }
+            encodeLengthPrefix(length, buffer)
             buffer.write(bytes)
         }
-        buffer.copyTo(stream)
     }
 
-    override fun decode(stream: InputStream): String {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
+    override fun decode(buffer: Buffer): String {
         val wire = buffer.readByte().toInt() and 0xFF
         return if (wire == 242) {
             ""
@@ -356,7 +366,12 @@ private object StringSerializer : SerializerImpl<String> {
     }
 
     override fun fromJson(json: JsonElement): String {
-        return json.jsonPrimitive.content
+        val jsonPrimitive = json.jsonPrimitive
+        return if ((0) == jsonPrimitive.intOrNull) {
+            ""
+        } else {
+            jsonPrimitive.content
+        }
     }
 }
 
@@ -367,34 +382,19 @@ private object BytesSerializer : SerializerImpl<ByteString> {
 
     override fun encode(
         input: ByteString,
-        stream: OutputStream,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
         if (input.size == 0) {
             buffer.writeByte(244)
         } else {
             buffer.writeByte(245)
             val length = input.size
-            // Encode length using the same scheme as int32
-            when {
-                length < 232 -> buffer.writeByte(length)
-                length < 65536 -> {
-                    buffer.writeByte(232)
-                    buffer.writeShortLe(length)
-                }
-                else -> {
-                    buffer.writeByte(233)
-                    buffer.writeIntLe(length)
-                }
-            }
+            encodeLengthPrefix(length, buffer)
             buffer.write(input)
         }
-        buffer.copyTo(stream)
     }
 
-    override fun decode(stream: InputStream): ByteString {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
+    override fun decode(buffer: Buffer): ByteString {
         val wire = buffer.readByte().toInt() and 0xFF
         return if (wire == 0 || wire == 244) {
             ByteString.EMPTY
@@ -409,23 +409,15 @@ private object BytesSerializer : SerializerImpl<ByteString> {
         input: ByteString,
         flavor: JsonFlavor,
     ): JsonElement {
-        return when (flavor) {
-            JsonFlavor.DENSE -> JsonPrimitive(input.base64())
-            JsonFlavor.READABLE -> {
-                JsonObject(
-                    mapOf(
-                        "base64" to JsonPrimitive(input.base64()),
-                        "size" to JsonPrimitive(input.size),
-                    ),
-                )
-            }
-        }
+        return JsonPrimitive(input.base64())
     }
 
     override fun fromJson(json: JsonElement): ByteString {
-        return when {
-            json is JsonObject -> json["base64"]!!.jsonPrimitive.content.decodeBase64()!!
-            else -> json.jsonPrimitive.content.decodeBase64()!!
+        val jsonPrimitive = json.jsonPrimitive
+        return if ((0) == jsonPrimitive.intOrNull) {
+            ByteString.EMPTY
+        } else {
+            jsonPrimitive.content.decodeBase64()!!
         }
     }
 }
@@ -437,28 +429,24 @@ private object TimestampSerializer : SerializerImpl<Instant> {
 
     override fun encode(
         input: Instant,
-        stream: OutputStream,
+        buffer: Buffer,
     ) {
-        val buffer = Buffer()
-        val unixMillis = input.toEpochMilli()
+        val unixMillis = clampUnixMillis(input.toEpochMilli())
         if (unixMillis == 0L) {
             buffer.writeByte(0)
         } else {
             buffer.writeByte(239)
             buffer.writeLongLe(unixMillis)
         }
-        buffer.copyTo(stream)
     }
 
-    override fun decode(stream: InputStream): Instant {
-        val buffer = Buffer()
-        buffer.writeAll(stream.source())
-        val wire = buffer.readByte().toInt() and 0xFF
+    override fun decode(buffer: Buffer): Instant {
+        val wire = buffer.readByte().toInt()
         return if (wire == 0) {
             Instant.EPOCH
         } else {
             // Should be wire 239
-            val unixMillis = buffer.readLongLe()
+            val unixMillis = clampUnixMillis(buffer.readLongLe())
             Instant.ofEpochMilli(unixMillis)
         }
     }
@@ -467,10 +455,10 @@ private object TimestampSerializer : SerializerImpl<Instant> {
         input: Instant,
         flavor: JsonFlavor,
     ): JsonElement {
+        val unixMillis = clampUnixMillis(input.toEpochMilli())
         return when (flavor) {
-            JsonFlavor.DENSE -> JsonPrimitive(input.toEpochMilli())
+            JsonFlavor.DENSE -> JsonPrimitive(unixMillis)
             JsonFlavor.READABLE -> {
-                val unixMillis = input.toEpochMilli()
                 JsonObject(
                     mapOf(
                         "unix_millis" to JsonPrimitive(unixMillis),
@@ -484,7 +472,7 @@ private object TimestampSerializer : SerializerImpl<Instant> {
     override fun fromJson(json: JsonElement): Instant {
         return when {
             json is JsonObject -> {
-                val unixMillis = json["unix_millis"]!!.jsonPrimitive.content.toLong()
+                val unixMillis = clampUnixMillis(json["unix_millis"]!!.jsonPrimitive.content.toLong())
                 Instant.ofEpochMilli(unixMillis)
             }
             else -> {
@@ -494,13 +482,13 @@ private object TimestampSerializer : SerializerImpl<Instant> {
                     if (content.contains('T') || content.contains('Z')) {
                         Instant.parse(content)
                     } else {
-                        val unixMillis = content.toLong()
+                        val unixMillis = clampUnixMillis(content.toLong())
                         Instant.ofEpochMilli(unixMillis)
                     }
                 } catch (e: Exception) {
                     // If parsing as ISO fails, try as unix millis
                     try {
-                        val unixMillis = content.toLong()
+                        val unixMillis = clampUnixMillis(content.toLong())
                         Instant.ofEpochMilli(unixMillis)
                     } catch (e2: Exception) {
                         // If both fail, try parsing as ISO again (for better error message)
@@ -509,5 +497,9 @@ private object TimestampSerializer : SerializerImpl<Instant> {
                 }
             }
         }
+    }
+
+    fun clampUnixMillis(unixMillis: Long): Long {
+        return unixMillis.coerceIn(-8640000000000000, 8640000000000000)
     }
 }

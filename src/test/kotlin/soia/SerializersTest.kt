@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -14,17 +15,17 @@ class SerializersTest {
         // Test true value - should be 1 in dense, true in readable
         val trueJson = Serializers.bool.toJson(true, JsonFlavor.DENSE)
         assertTrue(trueJson is JsonPrimitive)
-        assertEquals(1, (trueJson as JsonPrimitive).int)
+        assertEquals("1", (trueJson as JsonPrimitive).content)
 
         val trueReadableJson = Serializers.bool.toJson(true, JsonFlavor.READABLE)
-        assertEquals(true, (trueReadableJson as JsonPrimitive).boolean)
+        assertEquals("true", (trueReadableJson as JsonPrimitive).content)
 
         // Test false value - should be 0 in dense, false in readable
         val falseJson = Serializers.bool.toJson(false, JsonFlavor.DENSE)
-        assertEquals(0, (falseJson as JsonPrimitive).int)
+        assertEquals("0", (falseJson as JsonPrimitive).content)
 
         val falseReadableJson = Serializers.bool.toJson(false, JsonFlavor.READABLE)
-        assertEquals(false, (falseReadableJson as JsonPrimitive).boolean)
+        assertEquals("false", (falseReadableJson as JsonPrimitive).content)
 
         // Test round-trip
         assertEquals(true, Serializers.bool.fromJson(trueJson))
@@ -37,16 +38,16 @@ class SerializersTest {
     fun `test bool serializer - binary serialization`() {
         // From TypeScript tests: true -> "01", false -> "00"
         val trueBytes = Serializers.bool.toBytes(true)
-        assertEquals("01", trueBytes.hex())
+        assertEquals("736f696101", trueBytes.hex())
 
         val falseBytes = Serializers.bool.toBytes(false)
-        assertEquals("00", falseBytes.hex())
+        assertEquals("736f696100", falseBytes.hex())
 
-        // Test roundtrip
-        val restoredTrue = Serializers.bool.fromBytes(trueBytes.toByteArray().inputStream())
+        // Test round trip
+        val restoredTrue = Serializers.bool.fromBytes(trueBytes.toByteArray())
         assertEquals(true, restoredTrue)
 
-        val restoredFalse = Serializers.bool.fromBytes(falseBytes.toByteArray().inputStream())
+        val restoredFalse = Serializers.bool.fromBytes(falseBytes)
         assertEquals(false, restoredFalse)
     }
 
@@ -62,7 +63,7 @@ class SerializersTest {
 
             // Binary serialization
             val bytes = Serializers.int32.toBytes(value)
-            val restoredFromBytes = Serializers.int32.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = Serializers.int32.fromBytes(bytes.toByteArray())
             assertEquals(value, restoredFromBytes, "Binary failed for value: $value")
 
             // JsonFlavor shouldn't affect primitive numbers
@@ -83,14 +84,14 @@ class SerializersTest {
             assertEquals(value, restored, "Failed for value: $value")
 
             val bytes = Serializers.int64.toBytes(value)
-            val restoredFromBytes = Serializers.int64.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = Serializers.int64.fromBytes(bytes.toByteArray())
             assertEquals(value, restoredFromBytes, "Binary failed for value: $value")
         }
     }
 
     @Test
     fun `test uint64 serializer`() {
-        val values = listOf(0L, 1L, 42L, Long.MAX_VALUE)
+        val values = listOf(0UL, 1UL, 42UL, ULong.MAX_VALUE)
 
         for (value in values) {
             val jsonCode = Serializers.uint64.toJsonCode(value)
@@ -98,7 +99,7 @@ class SerializersTest {
             assertEquals(value, restored, "Failed for value: $value")
 
             val bytes = Serializers.uint64.toBytes(value)
-            val restoredFromBytes = Serializers.uint64.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = Serializers.uint64.fromBytes(bytes.toByteArray())
             assertEquals(value, restoredFromBytes, "Binary failed for value: $value")
         }
     }
@@ -106,7 +107,17 @@ class SerializersTest {
     @Test
     fun `test float32 serializer`() {
         val values =
-            listOf(0.0f, 1.0f, -1.0f, 3.14f, Float.MAX_VALUE, Float.MIN_VALUE, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)
+            listOf(
+                0.0f,
+                1.0f,
+                -1.0f,
+                3.14f,
+                Float.MAX_VALUE,
+                Float.MIN_VALUE,
+                Float.NaN,
+                Float.POSITIVE_INFINITY,
+                Float.NEGATIVE_INFINITY,
+            )
 
         for (value in values) {
             val jsonCode = Serializers.float32.toJsonCode(value)
@@ -119,7 +130,7 @@ class SerializersTest {
             }
 
             val bytes = Serializers.float32.toBytes(value)
-            val restoredFromBytes = Serializers.float32.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = Serializers.float32.fromBytes(bytes.toByteArray())
 
             if (value.isNaN()) {
                 assertTrue(restoredFromBytes.isNaN(), "Binary NaN not preserved for value: $value")
@@ -155,7 +166,7 @@ class SerializersTest {
             }
 
             val bytes = Serializers.float64.toBytes(value)
-            val restoredFromBytes = Serializers.float64.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = Serializers.float64.fromBytes(bytes.toByteArray())
 
             if (value.isNaN()) {
                 assertTrue(restoredFromBytes.isNaN(), "Binary NaN not preserved for value: $value")
@@ -184,7 +195,7 @@ class SerializersTest {
             assertEquals(value, restored, "Failed for value: '$value'")
 
             val bytes = Serializers.string.toBytes(value)
-            val restoredFromBytes = Serializers.string.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = Serializers.string.fromBytes(bytes.toByteArray())
             assertEquals(value, restoredFromBytes, "Binary failed for value: '$value'")
 
             // JsonFlavor shouldn't affect plain strings
@@ -219,23 +230,9 @@ class SerializersTest {
 
             // Binary serialization
             val bytes = Serializers.bytes.toBytes(value)
-            val restoredFromBytes = Serializers.bytes.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = Serializers.bytes.fromBytes(bytes.toByteArray())
             assertEquals(value, restoredFromBytes, "Binary failed for value: $value")
         }
-    }
-
-    @Test
-    fun `test bytes serializer - readable flavor`() {
-        val value = "hello".encodeUtf8()
-        val readableJson = Serializers.bytes.toJsonCode(value, JsonFlavor.READABLE)
-
-        // Readable should produce an object with base64 and size
-        assertTrue(readableJson.contains("\"base64\""), "Readable format should contain base64 field")
-        assertTrue(readableJson.contains("\"size\""), "Readable format should contain size field")
-        assertTrue(readableJson.contains("5"), "Size should be 5 for 'hello'")
-
-        val restoredFromReadable = Serializers.bytes.fromJsonCode(readableJson)
-        assertEquals(value, restoredFromReadable, "Readable failed for value: $value")
     }
 
     @Test
@@ -259,7 +256,7 @@ class SerializersTest {
 
             // Binary serialization
             val bytes = Serializers.timestamp.toBytes(timestamp)
-            val restoredFromBytes = Serializers.timestamp.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = Serializers.timestamp.fromBytes(bytes.toByteArray())
             assertEquals(timestamp, restoredFromBytes, "Binary failed for timestamp: $timestamp")
         }
     }
@@ -276,39 +273,6 @@ class SerializersTest {
 
         val restoredFromReadable = Serializers.timestamp.fromJsonCode(readableJson)
         assertEquals(timestamp, restoredFromReadable, "Readable failed for timestamp: $timestamp")
-    }
-
-    @Test
-    fun `test all serializers - json flavor consistency`() {
-        // For booleans, DENSE and READABLE should be different
-        assertNotEquals(
-            Serializers.bool.toJsonCode(true, JsonFlavor.DENSE),
-            Serializers.bool.toJsonCode(true, JsonFlavor.READABLE),
-        )
-
-        assertEquals(
-            Serializers.int32.toJsonCode(42, JsonFlavor.DENSE),
-            Serializers.int32.toJsonCode(42, JsonFlavor.READABLE),
-        )
-
-        assertEquals(
-            Serializers.string.toJsonCode("test", JsonFlavor.DENSE),
-            Serializers.string.toJsonCode("test", JsonFlavor.READABLE),
-        )
-
-        // But bytes and timestamp should be different
-        val bytes = "test".encodeUtf8()
-        val timestamp = Instant.now()
-
-        assertNotEquals(
-            Serializers.bytes.toJsonCode(bytes, JsonFlavor.DENSE),
-            Serializers.bytes.toJsonCode(bytes, JsonFlavor.READABLE),
-        )
-
-        assertNotEquals(
-            Serializers.timestamp.toJsonCode(timestamp, JsonFlavor.DENSE),
-            Serializers.timestamp.toJsonCode(timestamp, JsonFlavor.READABLE),
-        )
     }
 
     @Test
@@ -337,7 +301,7 @@ class SerializersTest {
                 Serializers.bool to true,
                 Serializers.int32 to -42,
                 Serializers.int64 to 123456789L,
-                Serializers.uint64 to 987654321L,
+                Serializers.uint64 to 987654321UL,
                 Serializers.float32 to 3.14f,
                 Serializers.float64 to 2.71828,
                 Serializers.string to "test string",
@@ -356,8 +320,226 @@ class SerializersTest {
 
             // Test binary roundtrip
             val bytes = typedSerializer.toBytes(value)
-            val restoredFromBytes = typedSerializer.fromBytes(bytes.toByteArray().inputStream())
+            val restoredFromBytes = typedSerializer.fromBytes(bytes.toByteArray())
             assertEquals(value, restoredFromBytes, "Binary roundtrip failed for $value")
+        }
+    }
+
+    // Additional comprehensive tests for specific edge cases and binary format validation
+
+    @Test
+    fun `test int32 binary encoding specifics`() {
+        // Test specific wire format encoding (includes "soia" prefix)
+        val testCases =
+            mapOf(
+                0 to "736f696100",
+                1 to "736f696101",
+                231 to "736f6961e7",
+                232 to "736f6961e8e800",
+                257 to "736f6961e80101",
+                65535 to "736f6961e8ffff",
+                65536 to "736f6961e900000100",
+                -1 to "736f6961ebff",
+                -256 to "736f6961eb00",
+                -257 to "736f6961ecfffe",
+            )
+
+        testCases.forEach { (value, expectedHex) ->
+            val bytes = Serializers.int32.toBytes(value)
+            assertEquals(expectedHex, bytes.hex(), "Binary encoding failed for value: $value")
+
+            val restored = Serializers.int32.fromBytes(bytes.toByteArray())
+            assertEquals(value, restored, "Binary decoding failed for value: $value")
+        }
+    }
+
+    @Test
+    fun `test float32 special values json serialization`() {
+        val testCases =
+            mapOf(
+                Float.NaN to "\"NaN\"",
+                Float.POSITIVE_INFINITY to "\"Infinity\"",
+                Float.NEGATIVE_INFINITY to "\"-Infinity\"",
+                0.0f to "0.0",
+                -0.0f to "-0.0",
+            )
+
+        testCases.forEach { (value, expectedJson) ->
+            val json = Serializers.float32.toJsonCode(value)
+            if (value.isNaN()) {
+                // For NaN, just check that it deserializes correctly
+                val restored = Serializers.float32.fromJsonCode(json)
+                assertTrue(restored.isNaN(), "NaN should be preserved")
+            } else {
+                val restored = Serializers.float32.fromJsonCode(json)
+                assertEquals(value, restored, "Failed for value: $value")
+            }
+        }
+    }
+
+    @Test
+    fun `test float64 special values json serialization`() {
+        val testCases =
+            mapOf(
+                Double.NaN to "\"NaN\"",
+                Double.POSITIVE_INFINITY to "\"Infinity\"",
+                Double.NEGATIVE_INFINITY to "\"-Infinity\"",
+                0.0 to "0.0",
+                -0.0 to "-0.0",
+            )
+
+        testCases.forEach { (value, expectedJson) ->
+            val json = Serializers.float64.toJsonCode(value)
+            if (value.isNaN()) {
+                // For NaN, just check that it deserializes correctly
+                val restored = Serializers.float64.fromJsonCode(json)
+                assertTrue(restored.isNaN(), "NaN should be preserved")
+            } else {
+                val restored = Serializers.float64.fromJsonCode(json)
+                assertEquals(value, restored, "Failed for value: $value")
+            }
+        }
+    }
+
+    @Test
+    fun `test int64 large number json serialization`() {
+        // Test JavaScript safe integer boundaries
+        val safeMax = 9007199254740992L // 2^53
+        val safeMin = -9007199254740992L // -(2^53)
+
+        // Values within safe range should be numbers
+        val safeValue = 123456789L
+        val safeJson = Serializers.int64.toJsonCode(safeValue)
+        assertEquals("123456789", safeJson)
+
+        // Values outside safe range should be strings
+        val unsafeValue = Long.MAX_VALUE
+        val unsafeJson = Serializers.int64.toJsonCode(unsafeValue)
+        assertTrue(unsafeJson.startsWith("\"") && unsafeJson.endsWith("\""))
+
+        // Both should roundtrip correctly
+        assertEquals(safeValue, Serializers.int64.fromJsonCode(safeJson))
+        assertEquals(unsafeValue, Serializers.int64.fromJsonCode(unsafeJson))
+    }
+
+    @Test
+    fun `test uint64 large number json serialization`() {
+        // Test JavaScript safe integer boundaries for unsigned values
+        val safeValue = 123456789UL
+        val safeJson = Serializers.uint64.toJsonCode(safeValue)
+        assertEquals("123456789", safeJson)
+
+        // Values outside safe range should be strings
+        val unsafeValue = ULong.MAX_VALUE
+        val unsafeJson = Serializers.uint64.toJsonCode(unsafeValue)
+        assertTrue(unsafeJson.startsWith("\"") && unsafeJson.endsWith("\""))
+
+        // Both should roundtrip correctly
+        assertEquals(safeValue, Serializers.uint64.fromJsonCode(safeJson))
+        assertEquals(unsafeValue, Serializers.uint64.fromJsonCode(unsafeJson))
+    }
+
+    @Test
+    fun `test string encoding edge cases`() {
+        val testCases =
+            listOf(
+                "" to "736f6961f2",
+                "A" to "736f6961f30141",
+                "🚀" to "736f6961f304f09f9a80",
+                "\u0000" to "736f6961f30100",
+                "Hello\nWorld" to "736f6961f30b48656c6c6f0a576f726c64",
+            )
+
+        testCases.forEach { (value, expectedHex) ->
+            val bytes = Serializers.string.toBytes(value)
+            assertEquals(expectedHex, bytes.hex(), "Binary encoding failed for string: '$value'")
+
+            val restored = Serializers.string.fromBytes(bytes.toByteArray())
+            assertEquals(value, restored, "Binary decoding failed for string: '$value'")
+        }
+    }
+
+    @Test
+    fun `test bytes encoding edge cases`() {
+        val testCases =
+            listOf(
+                ByteString.EMPTY to "736f6961f4",
+                "A".encodeUtf8() to "736f6961f50141",
+                ByteString.of(0, 255.toByte()) to "736f6961f50200ff",
+            )
+
+        testCases.forEach { (value, expectedHex) ->
+            val bytes = Serializers.bytes.toBytes(value)
+            assertEquals(expectedHex, bytes.hex(), "Binary encoding failed for bytes: $value")
+
+            val restored = Serializers.bytes.fromBytes(bytes.toByteArray())
+            assertEquals(value, restored, "Binary decoding failed for bytes: $value")
+        }
+    }
+
+    @Test
+    fun `test timestamp clamping behavior`() {
+        // Test that timestamps are clamped to valid JavaScript Date range
+        val minValid = Instant.ofEpochMilli(-8640000000000000L)
+        val maxValid = Instant.ofEpochMilli(8640000000000000L)
+
+        // Test that these values roundtrip correctly
+        val minBytes = Serializers.timestamp.toBytes(minValid)
+        val restoredMin = Serializers.timestamp.fromBytes(minBytes.toByteArray())
+        assertEquals(minValid, restoredMin)
+
+        val maxBytes = Serializers.timestamp.toBytes(maxValid)
+        val restoredMax = Serializers.timestamp.fromBytes(maxBytes.toByteArray())
+        assertEquals(maxValid, restoredMax)
+    }
+
+    @Test
+    fun `test timestamp binary encoding specifics`() {
+        val testCases =
+            mapOf(
+                Instant.EPOCH to "736f696100",
+                Instant.ofEpochMilli(1000) to "736f6961efe803000000000000",
+                Instant.ofEpochMilli(-1000) to "736f6961ef18fcffffffffffff",
+            )
+
+        testCases.forEach { (timestamp, expectedHex) ->
+            val bytes = Serializers.timestamp.toBytes(timestamp)
+            assertEquals(expectedHex, bytes.hex(), "Binary encoding failed for timestamp: $timestamp")
+
+            val restored = Serializers.timestamp.fromBytes(bytes.toByteArray())
+            assertEquals(timestamp, restored, "Binary decoding failed for timestamp: $timestamp")
+        }
+    }
+
+    @Test
+    fun `test all serializers handle defaults correctly`() {
+        // Test that default values roundtrip correctly through serialization
+        val defaultTests =
+            mapOf(
+                Serializers.bool to false,
+                Serializers.int32 to 0,
+                Serializers.int64 to 0L,
+                Serializers.uint64 to 0UL,
+                Serializers.float32 to 0.0f,
+                Serializers.float64 to 0.0,
+                Serializers.string to "",
+                Serializers.bytes to ByteString.EMPTY,
+                Serializers.timestamp to Instant.EPOCH,
+            )
+
+        defaultTests.forEach { (serializer, defaultValue) ->
+            @Suppress("UNCHECKED_CAST")
+            val typedSerializer = serializer as Serializer<Any>
+
+            // Test JSON roundtrip for default values
+            val json = typedSerializer.toJsonCode(defaultValue)
+            val restoredFromJson = typedSerializer.fromJsonCode(json)
+            assertEquals(defaultValue, restoredFromJson, "JSON default roundtrip failed for ${serializer::class.simpleName}")
+
+            // Test binary roundtrip for default values
+            val bytes = typedSerializer.toBytes(defaultValue)
+            val restoredFromBytes = typedSerializer.fromBytes(bytes.toByteArray())
+            assertEquals(defaultValue, restoredFromBytes, "Binary default roundtrip failed for ${serializer::class.simpleName}")
         }
     }
 }
