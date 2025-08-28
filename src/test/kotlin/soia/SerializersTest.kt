@@ -1,4 +1,4 @@
-package soia.internal.soia
+package soia
 
 import kotlinx.serialization.json.JsonPrimitive
 import okio.ByteString
@@ -6,8 +6,6 @@ import okio.ByteString.Companion.encodeUtf8
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import soia.JsonFlavor
-import soia.Serializer
 import java.time.Instant
 
 class SerializersTest {
