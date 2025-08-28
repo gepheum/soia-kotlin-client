@@ -29,9 +29,16 @@ class SerializersTest {
 
         // Test round-trip
         assertEquals(true, Serializers.bool.fromJson(trueJson))
+        assertEquals(true, Serializers.bool.fromJsonCode("true"))
         assertEquals(true, Serializers.bool.fromJson(trueReadableJson))
         assertEquals(false, Serializers.bool.fromJson(falseJson))
+        assertEquals(false, Serializers.bool.fromJsonCode("false"))
         assertEquals(false, Serializers.bool.fromJson(falseReadableJson))
+
+        assertEquals(true, Serializers.bool.fromJson(JsonPrimitive(100)))
+        assertEquals(true, Serializers.bool.fromJson(JsonPrimitive(3.14)))
+        assertEquals(false, Serializers.bool.fromJson(JsonPrimitive("0")))
+        assertEquals(true, Serializers.bool.fromJson(JsonPrimitive("-1")))
     }
 
     @Test
@@ -49,6 +56,11 @@ class SerializersTest {
 
         val restoredFalse = Serializers.bool.fromBytes(falseBytes)
         assertEquals(false, restoredFalse)
+
+        assertEquals(true, Serializers.bool.fromBytes(Serializers.int32.toBytes(100)))
+        assertEquals(true, Serializers.bool.fromBytes(Serializers.float32.toBytes(3.14F)))
+        assertEquals(true, Serializers.bool.fromBytes(Serializers.uint64.toBytes(10000000000000000UL)))
+        assertEquals(true, Serializers.bool.fromBytes(Serializers.int64.toBytes(-1)))
     }
 
     @Test
@@ -204,6 +216,8 @@ class SerializersTest {
                 Serializers.string.toJsonCode(value, JsonFlavor.READABLE),
             )
         }
+
+        assertEquals("", Serializers.string.fromJsonCode("0"))
     }
 
     @Test
@@ -233,6 +247,8 @@ class SerializersTest {
             val restoredFromBytes = Serializers.bytes.fromBytes(bytes.toByteArray())
             assertEquals(value, restoredFromBytes, "Binary failed for value: $value")
         }
+
+        assertEquals(ByteString.EMPTY, Serializers.bytes.fromJsonCode("0"))
     }
 
     @Test
@@ -267,9 +283,15 @@ class SerializersTest {
         val readableJson = Serializers.timestamp.toJsonCode(timestamp, JsonFlavor.READABLE)
 
         // Readable should produce an object with unix_millis and formatted
-        assertTrue(readableJson.contains("\"unix_millis\""), "Readable format should contain unix_millis field")
-        assertTrue(readableJson.contains("\"formatted\""), "Readable format should contain formatted field")
-        assertTrue(readableJson.contains("2025-08-25T10:30:45Z"), "Should contain the formatted timestamp")
+        assertEquals(
+            listOf(
+                "{",
+                "  \"unix_millis\": 1756117845000,",
+                "  \"formatted\": \"2025-08-25T10:30:45Z\"",
+                "}",
+            ).joinToString(separator = "\n") { it },
+            readableJson,
+        )
 
         val restoredFromReadable = Serializers.timestamp.fromJsonCode(readableJson)
         assertEquals(timestamp, restoredFromReadable, "Readable failed for timestamp: $timestamp")
@@ -288,9 +310,6 @@ class SerializersTest {
 
         // Test empty bytes
         assertEquals(ByteString.EMPTY, Serializers.bytes.fromJsonCode("\"\""))
-
-        // Test epoch timestamp
-        assertEquals(Instant.EPOCH, Serializers.timestamp.fromJsonCode("\"1970-01-01T00:00:00Z\""))
     }
 
     @Test
@@ -444,6 +463,7 @@ class SerializersTest {
         val testCases =
             listOf(
                 "" to "736f6961f2",
+                "0" to "736f6961f30130",
                 "A" to "736f6961f30141",
                 "🚀" to "736f6961f304f09f9a80",
                 "\u0000" to "736f6961f30100",

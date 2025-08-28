@@ -67,7 +67,11 @@ class Serializer<T> internal constructor(
             buffer.readByte().toInt() == 'i'.code &&
             buffer.readByte().toInt() == 'a'.code
         ) {
-            this.impl.decode(buffer)
+            val result = this.impl.decode(buffer)
+            if (!buffer.exhausted()) {
+                throw IllegalArgumentException("Extra bytes after deserialization")
+            }
+            result
         } else {
             this.fromJsonCode(buffer.readUtf8())
         }

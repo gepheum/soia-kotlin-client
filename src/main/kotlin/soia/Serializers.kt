@@ -1,5 +1,3 @@
-// TODO: throw exception when parsing bytes/JSON and invalid
-
 package soia
 
 import kotlinx.serialization.json.JsonElement
@@ -28,7 +26,7 @@ object Serializers {
 
 private fun decodeNumber(buffer: Buffer): Number {
     return when (val wire = buffer.readByte().toInt() and 0xFF) {
-        in 0..231 -> wire.toLong()
+        in 0..231 -> wire
         232 -> buffer.readShortLe().toInt() and 0xFFFF // uint16
         233 -> buffer.readIntLe().toLong() and 0xFFFFFFFF // uint32
         234 -> buffer.readLongLe() // uint64
@@ -39,7 +37,7 @@ private fun decodeNumber(buffer: Buffer): Number {
         239 -> buffer.readLongLe()
         240 -> Float.fromBits(buffer.readIntLe())
         241 -> Double.fromBits(buffer.readLongLe())
-        else -> wire
+        else -> throw IllegalArgumentException("Expected: number; wire: $wire")
     }
 }
 
@@ -74,7 +72,7 @@ private object BoolSerializer : SerializerImpl<Boolean> {
     }
 
     override fun decode(buffer: Buffer): Boolean {
-        return buffer.readByte() == 1.toByte()
+        return decodeNumber(buffer).toInt() != 0
     }
 
     override fun toJson(
@@ -352,7 +350,7 @@ private object StringSerializer : SerializerImpl<String> {
             ""
         } else {
             // Should be wire 243
-            val length = decodeNumber(buffer).toInt()
+            val length = decodeNumber(buffer)
             val bytes = buffer.readByteArray(length.toLong())
             String(bytes, Charsets.UTF_8)
         }
@@ -400,7 +398,7 @@ private object BytesSerializer : SerializerImpl<ByteString> {
             ByteString.EMPTY
         } else {
             // Should be wire 245
-            val length = decodeNumber(buffer).toInt()
+            val length = decodeNumber(buffer)
             buffer.readByteString(length.toLong())
         }
     }
@@ -441,14 +439,8 @@ private object TimestampSerializer : SerializerImpl<Instant> {
     }
 
     override fun decode(buffer: Buffer): Instant {
-        val wire = buffer.readByte().toInt()
-        return if (wire == 0) {
-            Instant.EPOCH
-        } else {
-            // Should be wire 239
-            val unixMillis = clampUnixMillis(buffer.readLongLe())
-            Instant.ofEpochMilli(unixMillis)
-        }
+        val unixMillis = clampUnixMillis(decodeNumber(buffer).toLong())
+        return Instant.ofEpochMilli(unixMillis)
     }
 
     override fun toJson(
@@ -462,7 +454,7 @@ private object TimestampSerializer : SerializerImpl<Instant> {
                 JsonObject(
                     mapOf(
                         "unix_millis" to JsonPrimitive(unixMillis),
-                        "formatted" to JsonPrimitive(input.toString()),
+                        "formatted" to JsonPrimitive(Instant.ofEpochMilli(unixMillis).toString()),
                     ),
                 )
             }
@@ -470,33 +462,9 @@ private object TimestampSerializer : SerializerImpl<Instant> {
     }
 
     override fun fromJson(json: JsonElement): Instant {
-        return when {
-            json is JsonObject -> {
-                val unixMillis = clampUnixMillis(json["unix_millis"]!!.jsonPrimitive.content.toLong())
-                Instant.ofEpochMilli(unixMillis)
-            }
-            else -> {
-                val content = json.jsonPrimitive.content
-                // Try to parse as ISO-8601 first, fall back to unix millis
-                try {
-                    if (content.contains('T') || content.contains('Z')) {
-                        Instant.parse(content)
-                    } else {
-                        val unixMillis = clampUnixMillis(content.toLong())
-                        Instant.ofEpochMilli(unixMillis)
-                    }
-                } catch (e: Exception) {
-                    // If parsing as ISO fails, try as unix millis
-                    try {
-                        val unixMillis = clampUnixMillis(content.toLong())
-                        Instant.ofEpochMilli(unixMillis)
-                    } catch (e2: Exception) {
-                        // If both fail, try parsing as ISO again (for better error message)
-                        Instant.parse(content)
-                    }
-                }
-            }
-        }
+        val unixMillisElement = if (json is JsonObject) json["unix_millis"]!! else json
+        val unixMillis = clampUnixMillis(unixMillisElement.jsonPrimitive.content.toLong())
+        return Instant.ofEpochMilli(unixMillis)
     }
 
     fun clampUnixMillis(unixMillis: Long): Long {
