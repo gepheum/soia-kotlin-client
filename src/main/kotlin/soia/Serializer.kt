@@ -5,41 +5,45 @@ import kotlinx.serialization.json.JsonElement
 import okio.Buffer
 import okio.ByteString
 
-enum class JsonFlavor {
-    DENSE,
-    READABLE,
-}
-
 class Serializer<T> internal constructor(
     internal val impl: SerializerImpl<T>,
 ) {
     fun toJson(
         input: T,
-        flavor: JsonFlavor = JsonFlavor.DENSE,
+        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        readableFlavor: Boolean = false,
     ): JsonElement {
-        return this.impl.toJson(input, flavor)
+        return this.impl.toJson(input, readableFlavor = readableFlavor)
     }
 
     fun toJsonCode(
         input: T,
-        flavor: JsonFlavor = JsonFlavor.DENSE,
+        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        readableFlavor: Boolean = false,
     ): String {
-        val jsonElement = this.impl.toJson(input, flavor)
-        return when (flavor) {
-            JsonFlavor.DENSE ->
-                Json.Default.encodeToString(JsonElement.serializer(), jsonElement)
-            JsonFlavor.READABLE ->
-                readableJson.encodeToString(JsonElement.serializer(), jsonElement)
+        val jsonElement = this.impl.toJson(input, readableFlavor = readableFlavor)
+        return if (readableFlavor) {
+            readableJson.encodeToString(JsonElement.serializer(), jsonElement)
+        } else {
+            Json.Default.encodeToString(JsonElement.serializer(), jsonElement)
         }
     }
 
-    fun fromJson(json: JsonElement): T {
-        return this.impl.fromJson(json)
+    fun fromJson(
+        json: JsonElement,
+        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        keepUnrecognizedFields: Boolean = false,
+    ): T {
+        return this.impl.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields)
     }
 
-    fun fromJsonCode(jsonCode: String): T {
+    fun fromJsonCode(
+        jsonCode: String,
+        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        keepUnrecognizedFields: Boolean = false,
+    ): T {
         val jsonElement = Json.Default.decodeFromString(JsonElement.serializer(), jsonCode)
-        return this.impl.fromJson(jsonElement)
+        return this.impl.fromJson(jsonElement, keepUnrecognizedFields = keepUnrecognizedFields)
     }
 
     fun toBytes(input: T): ByteString {
@@ -49,31 +53,42 @@ class Serializer<T> internal constructor(
         return buffer.readByteString()
     }
 
-    fun fromBytes(bytes: ByteArray): T {
+    fun fromBytes(
+        bytes: ByteArray,
+        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        keepUnrecognizedFields: Boolean = false,
+    ): T {
         val buffer = Buffer()
         buffer.write(bytes)
-        return this.fromBytes(buffer)
+        return this.fromBytes(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
     }
 
-    fun fromBytes(bytes: ByteString): T {
+    fun fromBytes(
+        bytes: ByteString,
+        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        keepUnrecognizedFields: Boolean = false,
+    ): T {
         val buffer = Buffer()
         buffer.write(bytes)
-        return this.fromBytes(buffer)
+        return this.fromBytes(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
     }
 
-    private fun fromBytes(buffer: Buffer): T {
+    private fun fromBytes(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean = false,
+    ): T {
         return if (buffer.readByte().toInt() == 's'.code &&
             buffer.readByte().toInt() == 'o'.code &&
             buffer.readByte().toInt() == 'i'.code &&
             buffer.readByte().toInt() == 'a'.code
         ) {
-            val result = this.impl.decode(buffer)
+            val result = this.impl.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
             if (!buffer.exhausted()) {
                 throw IllegalArgumentException("Extra bytes after deserialization")
             }
             result
         } else {
-            this.fromJsonCode(buffer.readUtf8())
+            this.fromJsonCode(buffer.readUtf8(), keepUnrecognizedFields = keepUnrecognizedFields)
         }
     }
 
@@ -87,20 +102,27 @@ class Serializer<T> internal constructor(
     }
 }
 
+// TODO: move to soia.internal
 internal interface SerializerImpl<T> {
     fun isDefault(value: T): Boolean
 
     fun toJson(
         input: T,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement
 
-    fun fromJson(json: JsonElement): T
+    fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): T
 
     fun encode(
         input: T,
         buffer: Buffer,
     )
 
-    fun decode(buffer: Buffer): T
+    fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean = false,
+    ): T
 }

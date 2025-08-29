@@ -54,21 +54,28 @@ private object BoolSerializer : SerializerImpl<Boolean> {
         buffer.writeByte(if (input) 1 else 0)
     }
 
-    override fun decode(buffer: Buffer): Boolean {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): Boolean {
         return decodeNumber(buffer).toInt() != 0
     }
 
     override fun toJson(
         input: Boolean,
-        flavor: JsonFlavor,
+        readable: Boolean,
     ): JsonElement {
-        return when (flavor) {
-            JsonFlavor.DENSE -> JsonPrimitive(if (input) 1 else 0)
-            JsonFlavor.READABLE -> JsonPrimitive(input)
+        return if (readable) {
+            JsonPrimitive(input)
+        } else {
+            JsonPrimitive(if (input) 1 else 0)
         }
     }
 
-    override fun fromJson(json: JsonElement): Boolean {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): Boolean {
         val primitive = json.jsonPrimitive
         return when (primitive.content) {
             "0" -> false
@@ -118,18 +125,24 @@ private object Int32Serializer : SerializerImpl<Int> {
         }
     }
 
-    override fun decode(buffer: Buffer): Int {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): Int {
         return decodeNumber(buffer).toInt()
     }
 
     override fun toJson(
         input: Int,
-        flavor: JsonFlavor,
+        readable: Boolean,
     ): JsonElement {
         return JsonPrimitive(input)
     }
 
-    override fun fromJson(json: JsonElement): Int {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): Int {
         return json.jsonPrimitive.content.toInt()
     }
 }
@@ -154,13 +167,16 @@ private object Int64Serializer : SerializerImpl<Long> {
         }
     }
 
-    override fun decode(buffer: Buffer): Long {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): Long {
         return decodeNumber(buffer).toLong()
     }
 
     override fun toJson(
         input: Long,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         return if (input in MIN_SAFE_JAVASCRIPT_INT..MAX_SAFE_JAVASCRIPT_INT) {
             JsonPrimitive(input)
@@ -169,7 +185,10 @@ private object Int64Serializer : SerializerImpl<Long> {
         }
     }
 
-    override fun fromJson(json: JsonElement): Long {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): Long {
         return json.jsonPrimitive.content.toLong()
     }
 }
@@ -203,13 +222,16 @@ private object Uint64Serializer : SerializerImpl<ULong> {
         }
     }
 
-    override fun decode(buffer: Buffer): ULong {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): ULong {
         return decodeNumber(buffer).toLong().toULong()
     }
 
     override fun toJson(
         input: ULong,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         return if (input <= MAX_SAFE_JAVASCRIPT_INT.toULong()) {
             JsonPrimitive(input.toLong())
@@ -218,7 +240,10 @@ private object Uint64Serializer : SerializerImpl<ULong> {
         }
     }
 
-    override fun fromJson(json: JsonElement): ULong {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): ULong {
         return json.jsonPrimitive.content.toULong()
     }
 }
@@ -240,13 +265,16 @@ private object Float32Serializer : SerializerImpl<Float> {
         }
     }
 
-    override fun decode(buffer: Buffer): Float {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): Float {
         return decodeNumber(buffer).toFloat()
     }
 
     override fun toJson(
         input: Float,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         return if (input.isFinite()) {
             JsonPrimitive(input)
@@ -255,7 +283,10 @@ private object Float32Serializer : SerializerImpl<Float> {
         }
     }
 
-    override fun fromJson(json: JsonElement): Float {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): Float {
         val primitive = json.jsonPrimitive
         return if (primitive.isString) {
             primitive.content.toFloat()
@@ -282,13 +313,16 @@ private object Float64Serializer : SerializerImpl<Double> {
         }
     }
 
-    override fun decode(buffer: Buffer): Double {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): Double {
         return decodeNumber(buffer).toDouble()
     }
 
     override fun toJson(
         input: Double,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         return if (input.isFinite()) {
             JsonPrimitive(input)
@@ -297,7 +331,10 @@ private object Float64Serializer : SerializerImpl<Double> {
         }
     }
 
-    override fun fromJson(json: JsonElement): Double {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): Double {
         val primitive = json.jsonPrimitive
         return if (primitive.isString) {
             primitive.content.toDouble()
@@ -327,7 +364,10 @@ private object StringSerializer : SerializerImpl<String> {
         }
     }
 
-    override fun decode(buffer: Buffer): String {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): String {
         val wire = buffer.readByte().toInt() and 0xFF
         return if (wire == 242) {
             ""
@@ -341,12 +381,15 @@ private object StringSerializer : SerializerImpl<String> {
 
     override fun toJson(
         input: String,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         return JsonPrimitive(input)
     }
 
-    override fun fromJson(json: JsonElement): String {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): String {
         val jsonPrimitive = json.jsonPrimitive
         return if (jsonPrimitive.isString) {
             jsonPrimitive.content
@@ -377,7 +420,10 @@ private object BytesSerializer : SerializerImpl<ByteString> {
         }
     }
 
-    override fun decode(buffer: Buffer): ByteString {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): ByteString {
         val wire = buffer.readByte().toInt() and 0xFF
         return if (wire == 0 || wire == 244) {
             ByteString.EMPTY
@@ -390,12 +436,15 @@ private object BytesSerializer : SerializerImpl<ByteString> {
 
     override fun toJson(
         input: ByteString,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         return JsonPrimitive(input.base64())
     }
 
-    override fun fromJson(json: JsonElement): ByteString {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): ByteString {
         val jsonPrimitive = json.jsonPrimitive
         return if (jsonPrimitive.isString) {
             jsonPrimitive.content.decodeBase64()!!
@@ -425,30 +474,35 @@ private object InstantSerializer : SerializerImpl<Instant> {
         }
     }
 
-    override fun decode(buffer: Buffer): Instant {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): Instant {
         val unixMillis = clampUnixMillis(decodeNumber(buffer).toLong())
         return Instant.ofEpochMilli(unixMillis)
     }
 
     override fun toJson(
         input: Instant,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         val unixMillis = clampUnixMillis(input.toEpochMilli())
-        return when (flavor) {
-            JsonFlavor.DENSE -> JsonPrimitive(unixMillis)
-            JsonFlavor.READABLE -> {
-                JsonObject(
-                    mapOf(
-                        "unix_millis" to JsonPrimitive(unixMillis),
-                        "formatted" to JsonPrimitive(Instant.ofEpochMilli(unixMillis).toString()),
-                    ),
-                )
-            }
+        return if (readableFlavor) {
+            JsonObject(
+                mapOf(
+                    "unix_millis" to JsonPrimitive(unixMillis),
+                    "formatted" to JsonPrimitive(Instant.ofEpochMilli(unixMillis).toString()),
+                ),
+            )
+        } else {
+            JsonPrimitive(unixMillis)
         }
     }
 
-    override fun fromJson(json: JsonElement): Instant {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): Instant {
         val unixMillisElement = if (json is JsonObject) json["unix_millis"]!! else json
         val unixMillis = clampUnixMillis(unixMillisElement.jsonPrimitive.content.toLong())
         return Instant.ofEpochMilli(unixMillis)
@@ -475,31 +529,37 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
         }
     }
 
-    override fun decode(buffer: Buffer): T? {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): T? {
         return if (buffer.peek().readByte().toInt() and 0xFF == 255) {
             buffer.skip(1)
             null
         } else {
-            this.other.decode(buffer)
+            this.other.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
         }
     }
 
     override fun toJson(
         input: T?,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         return if (input == null) {
             JsonNull
         } else {
-            this.other.toJson(input, flavor)
+            this.other.toJson(input, readableFlavor = readableFlavor)
         }
     }
 
-    override fun fromJson(json: JsonElement): T? {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): T? {
         return if (json is JsonNull) {
             null
         } else {
-            this.other.fromJson(json)
+            this.other.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields)
         }
     }
 }

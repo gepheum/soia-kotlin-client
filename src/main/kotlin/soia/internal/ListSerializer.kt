@@ -7,7 +7,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import okio.Buffer
 import soia.IndexedList
-import soia.JsonFlavor
 import soia.Serializer
 import soia.SerializerImpl
 
@@ -51,7 +50,10 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
         }
     }
 
-    override fun decode(buffer: Buffer): L {
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): L {
         val wire = buffer.readByte().toInt() and 0xFF
         if (wire == 0 || wire == 246) {
             return emptyList
@@ -66,25 +68,28 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
             }
         val items = mutableListOf<E>()
         for (i in 0 until size) {
-            items.add(item.decode(buffer))
+            items.add(item.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields))
         }
         return toList(items)
     }
 
     override fun toJson(
         input: L,
-        flavor: JsonFlavor,
+        readableFlavor: Boolean,
     ): JsonElement {
         return JsonArray(
-            input.map { item.toJson(it, flavor) },
+            input.map { item.toJson(it, readableFlavor = readableFlavor) },
         )
     }
 
-    override fun fromJson(json: JsonElement): L {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): L {
         return if (json is JsonPrimitive && 0 == json.intOrNull) {
             emptyList
         } else {
-            toList(json.jsonArray.map { item.fromJson(it) })
+            toList(json.jsonArray.map { item.fromJson(it, keepUnrecognizedFields == keepUnrecognizedFields) })
         }
     }
 
