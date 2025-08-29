@@ -1,9 +1,19 @@
 package soia
 
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.float
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
+import soia.internal.decodeNumber
+import soia.internal.encodeLengthPrefix
+import soia.internal.listSerializer
 import java.time.Instant
 
 object Serializers {
@@ -15,7 +25,7 @@ object Serializers {
     val float64: Serializer<Double> = Serializer(Float64Serializer)
     val string: Serializer<String> = Serializer(StringSerializer)
     val bytes: Serializer<ByteString> = Serializer(BytesSerializer)
-    val timestamp: Serializer<Instant> = Serializer(TimestampSerializer)
+    val instant: Serializer<Instant> = Serializer(InstantSerializer)
 
     fun <T> optional(other: Serializer<T>): Serializer<T?> {
         val otherImpl = other.impl
@@ -27,43 +37,8 @@ object Serializers {
         }
     }
 
-    fun <E> array(item: Serializer<E>): Serializer<List<E>> {
-        return Serializer(ArraySerializer(item.impl))
-    }
-}
-
-private fun decodeNumber(buffer: Buffer): Number {
-    return when (val wire = buffer.readByte().toInt() and 0xFF) {
-        in 0..231 -> wire
-        232 -> buffer.readShortLe().toInt() and 0xFFFF // uint16
-        233 -> buffer.readIntLe().toLong() and 0xFFFFFFFF // uint32
-        234 -> buffer.readLongLe() // uint64
-        235 -> (buffer.readByte().toInt() and 0xFF) - 256L
-        236 -> (buffer.readShortLe().toInt() and 0xFFFF) - 65536L
-        237 -> buffer.readIntLe()
-        238 -> buffer.readLongLe()
-        239 -> buffer.readLongLe()
-        240 -> Float.fromBits(buffer.readIntLe())
-        241 -> Double.fromBits(buffer.readLongLe())
-        else -> throw IllegalArgumentException("Expected: number; wire: $wire")
-    }
-}
-
-private fun encodeLengthPrefix(
-    length: Int,
-    buffer: Buffer,
-) {
-    // Encode length using the same scheme as int32
-    when {
-        length < 232 -> buffer.writeByte(length)
-        length < 65536 -> {
-            buffer.writeByte(232)
-            buffer.writeShortLe(length)
-        }
-        else -> {
-            buffer.writeByte(233)
-            buffer.writeIntLe(length)
-        }
+    fun <E> list(item: Serializer<E>): Serializer<List<E>> {
+        return listSerializer(item)
     }
 }
 
@@ -432,7 +407,7 @@ private object BytesSerializer : SerializerImpl<ByteString> {
     }
 }
 
-private object TimestampSerializer : SerializerImpl<Instant> {
+private object InstantSerializer : SerializerImpl<Instant> {
     override fun isDefault(value: Instant): Boolean {
         return value == Instant.EPOCH
     }
@@ -525,63 +500,6 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
             null
         } else {
             this.other.fromJson(json)
-        }
-    }
-}
-
-private class ArraySerializer<E>(val item: SerializerImpl<E>) : SerializerImpl<List<E>> {
-    override fun isDefault(value: List<E>): Boolean {
-        return value.isEmpty()
-    }
-
-    override fun encode(
-        input: List<E>,
-        buffer: Buffer,
-    ) {
-        val size = input.size
-        if (size <= 3) {
-            buffer.writeByte(246 + size)
-        } else {
-            buffer.writeByte(250)
-            encodeLengthPrefix(size, buffer)
-        }
-        var numItems = 0
-        for (item in input) {
-            this.item.encode(item, buffer)
-            numItems++
-        }
-        if (numItems != size) {
-            throw IllegalArgumentException("Expected: $size items; got: $numItems")
-        }
-    }
-
-    override fun decode(buffer: Buffer): List<E> {
-        val wire = buffer.readByte().toInt() and 0xFF
-        if (wire == 0 || wire == 246) {
-            return soia.internal.emptyFrozenList()
-        }
-        val size = if (wire == 250) decodeNumber(buffer).toInt() else wire - 246
-        val items = mutableListOf<E>()
-        for (i in 0 until size) {
-            items.add(item.decode(buffer))
-        }
-        return soia.internal.toFrozenList(items)
-    }
-
-    override fun toJson(
-        input: List<E>,
-        flavor: JsonFlavor,
-    ): JsonElement {
-        return JsonArray(
-            input.map { item.toJson(it, flavor) },
-        )
-    }
-
-    override fun fromJson(json: JsonElement): List<E> {
-        return if (json is JsonPrimitive && 0 == json.intOrNull) {
-            soia.internal.emptyFrozenList()
-        } else {
-            soia.internal.toFrozenList(json.jsonArray.map { item.fromJson(it) })
         }
     }
 }

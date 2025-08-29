@@ -1,0 +1,114 @@
+package soia.internal
+
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import okio.Buffer
+import soia.IndexedList
+import soia.JsonFlavor
+import soia.Serializer
+import soia.SerializerImpl
+
+fun <E> listSerializer(item: Serializer<E>): Serializer<List<E>> {
+    return Serializer(ListSerializer(item.impl))
+}
+
+fun <E, K> indexedListSerializer(
+    item: Serializer<E>,
+    getKeySpec: String,
+    getKey: (E) -> K,
+): Serializer<IndexedList<E, K>> {
+    return Serializer(IndexedListSerializer(item.impl, getKeySpec, getKey))
+}
+
+private abstract class AbstractListSerializer<E, L : List<E>>(
+    val item: SerializerImpl<E>,
+) : SerializerImpl<L> {
+    override fun isDefault(value: L): Boolean {
+        return value.isEmpty()
+    }
+
+    override fun encode(
+        input: L,
+        buffer: Buffer,
+    ) {
+        val size = input.size
+        if (size <= 3) {
+            buffer.writeByte(246 + size)
+        } else {
+            buffer.writeByte(250)
+            encodeLengthPrefix(size, buffer)
+        }
+        var numItems = 0
+        for (item in input) {
+            this.item.encode(item, buffer)
+            numItems++
+        }
+        if (numItems != size) {
+            throw IllegalArgumentException("Expected: $size items; got: $numItems")
+        }
+    }
+
+    override fun decode(buffer: Buffer): L {
+        val wire = buffer.readByte().toInt() and 0xFF
+        if (wire == 0 || wire == 246) {
+            return emptyList
+        }
+        val size =
+            if (wire == 250) {
+                decodeNumber(buffer).toInt()
+            } else if (wire in 247..249) {
+                wire - 246
+            } else {
+                throw IllegalArgumentException("Expected: list; wire: $wire")
+            }
+        val items = mutableListOf<E>()
+        for (i in 0 until size) {
+            items.add(item.decode(buffer))
+        }
+        return toList(items)
+    }
+
+    override fun toJson(
+        input: L,
+        flavor: JsonFlavor,
+    ): JsonElement {
+        return JsonArray(
+            input.map { item.toJson(it, flavor) },
+        )
+    }
+
+    override fun fromJson(json: JsonElement): L {
+        return if (json is JsonPrimitive && 0 == json.intOrNull) {
+            emptyList
+        } else {
+            toList(json.jsonArray.map { item.fromJson(it) })
+        }
+    }
+
+    abstract val emptyList: L
+
+    abstract fun toList(list: List<E>): L
+}
+
+private class ListSerializer<E>(item: SerializerImpl<E>) : AbstractListSerializer<E, List<E>>(item) {
+    override val emptyList: List<E> = emptyList()
+
+    override fun toList(list: List<E>): List<E> {
+        return toFrozenList(list)
+    }
+}
+
+private class IndexedListSerializer<E, K>(
+    item: SerializerImpl<E>,
+    val getKeySpec: String,
+    val getKey: (E) -> K,
+) : AbstractListSerializer<E, IndexedList<E, K>>(item) {
+    override val emptyList: IndexedList<E, K> = emptyIndexedList()
+
+    override fun toList(list: List<E>): IndexedList<E, K> {
+        return toIndexedList(list, getKeySpec, getKey)
+    }
+}

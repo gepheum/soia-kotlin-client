@@ -252,8 +252,8 @@ class SerializersTest {
     }
 
     @Test
-    fun `test timestamp serializer - dense flavor`() {
-        val timestamps =
+    fun `test instant serializer - dense flavor`() {
+        val instants =
             listOf(
                 Instant.EPOCH,
                 Instant.parse("2025-08-25T10:30:45Z"),
@@ -261,26 +261,26 @@ class SerializersTest {
                 Instant.ofEpochMilli(System.currentTimeMillis()),
             )
 
-        for (timestamp in timestamps) {
-            val denseJson = Serializers.timestamp.toJsonCode(timestamp, JsonFlavor.DENSE)
-            val restored = Serializers.timestamp.fromJsonCode(denseJson)
-            assertEquals(timestamp, restored, "Dense failed for timestamp: $timestamp")
+        for (instant in instants) {
+            val denseJson = Serializers.instant.toJsonCode(instant, JsonFlavor.DENSE)
+            val restored = Serializers.instant.fromJsonCode(denseJson)
+            assertEquals(instant, restored, "Dense failed for instant: $instant")
 
             // Dense should produce a unix milliseconds number
             val denseJsonValue = denseJson.toLongOrNull()
             assertNotNull(denseJsonValue, "Dense format should be a number, got: $denseJson")
 
             // Binary serialization
-            val bytes = Serializers.timestamp.toBytes(timestamp)
-            val restoredFromBytes = Serializers.timestamp.fromBytes(bytes.toByteArray())
-            assertEquals(timestamp, restoredFromBytes, "Binary failed for timestamp: $timestamp")
+            val bytes = Serializers.instant.toBytes(instant)
+            val restoredFromBytes = Serializers.instant.fromBytes(bytes.toByteArray())
+            assertEquals(instant, restoredFromBytes, "Binary failed for instant: $instant")
         }
     }
 
     @Test
-    fun `test timestamp serializer - readable flavor`() {
-        val timestamp = Instant.parse("2025-08-25T10:30:45Z")
-        val readableJson = Serializers.timestamp.toJsonCode(timestamp, JsonFlavor.READABLE)
+    fun `test instant serializer - readable flavor`() {
+        val instant = Instant.parse("2025-08-25T10:30:45Z")
+        val readableJson = Serializers.instant.toJsonCode(instant, JsonFlavor.READABLE)
 
         // Readable should produce an object with unix_millis and formatted
         assertEquals(
@@ -293,8 +293,8 @@ class SerializersTest {
             readableJson,
         )
 
-        val restoredFromReadable = Serializers.timestamp.fromJsonCode(readableJson)
-        assertEquals(timestamp, restoredFromReadable, "Readable failed for timestamp: $timestamp")
+        val restoredFromReadable = Serializers.instant.fromJsonCode(readableJson)
+        assertEquals(instant, restoredFromReadable, "Readable failed for instant: $instant")
     }
 
     @Test
@@ -325,7 +325,7 @@ class SerializersTest {
                 Serializers.float64 to 2.71828,
                 Serializers.string to "test string",
                 Serializers.bytes to "test bytes".encodeUtf8(),
-                Serializers.timestamp to Instant.parse("2025-08-25T12:00:00Z"),
+                Serializers.instant to Instant.parse("2025-08-25T12:00:00Z"),
             )
 
         testData.forEach { (serializer, value) ->
@@ -498,23 +498,23 @@ class SerializersTest {
     }
 
     @Test
-    fun `test timestamp clamping behavior`() {
-        // Test that timestamps are clamped to valid JavaScript Date range
+    fun `test instant clamping behavior`() {
+        // Test that instants are clamped to valid JavaScript Date range
         val minValid = Instant.ofEpochMilli(-8640000000000000L)
         val maxValid = Instant.ofEpochMilli(8640000000000000L)
 
         // Test that these values roundtrip correctly
-        val minBytes = Serializers.timestamp.toBytes(minValid)
-        val restoredMin = Serializers.timestamp.fromBytes(minBytes.toByteArray())
+        val minBytes = Serializers.instant.toBytes(minValid)
+        val restoredMin = Serializers.instant.fromBytes(minBytes.toByteArray())
         assertEquals(minValid, restoredMin)
 
-        val maxBytes = Serializers.timestamp.toBytes(maxValid)
-        val restoredMax = Serializers.timestamp.fromBytes(maxBytes.toByteArray())
+        val maxBytes = Serializers.instant.toBytes(maxValid)
+        val restoredMax = Serializers.instant.fromBytes(maxBytes.toByteArray())
         assertEquals(maxValid, restoredMax)
     }
 
     @Test
-    fun `test timestamp binary encoding specifics`() {
+    fun `test instant binary encoding specifics`() {
         val testCases =
             mapOf(
                 Instant.EPOCH to "736f696100",
@@ -522,12 +522,12 @@ class SerializersTest {
                 Instant.ofEpochMilli(-1000) to "736f6961ef18fcffffffffffff",
             )
 
-        testCases.forEach { (timestamp, expectedHex) ->
-            val bytes = Serializers.timestamp.toBytes(timestamp)
-            assertEquals(expectedHex, bytes.hex(), "Binary encoding failed for timestamp: $timestamp")
+        testCases.forEach { (instant, expectedHex) ->
+            val bytes = Serializers.instant.toBytes(instant)
+            assertEquals(expectedHex, bytes.hex(), "Binary encoding failed for instant: $instant")
 
-            val restored = Serializers.timestamp.fromBytes(bytes.toByteArray())
-            assertEquals(timestamp, restored, "Binary decoding failed for timestamp: $timestamp")
+            val restored = Serializers.instant.fromBytes(bytes.toByteArray())
+            assertEquals(instant, restored, "Binary decoding failed for instant: $instant")
         }
     }
 
@@ -544,7 +544,7 @@ class SerializersTest {
                 Serializers.float64 to 0.0,
                 Serializers.string to "",
                 Serializers.bytes to ByteString.EMPTY,
-                Serializers.timestamp to Instant.EPOCH,
+                Serializers.instant to Instant.EPOCH,
             )
 
         defaultTests.forEach { (serializer, defaultValue) ->
@@ -570,7 +570,7 @@ class SerializersTest {
         val stringOptional = Serializers.optional(Serializers.string)
         val boolOptional = Serializers.optional(Serializers.bool)
         val bytesOptional = Serializers.optional(Serializers.bytes)
-        val timestampOptional = Serializers.optional(Serializers.timestamp)
+        val instantOptional = Serializers.optional(Serializers.instant)
 
         // Test non-null values
         val testValue = 42
@@ -612,14 +612,14 @@ class SerializersTest {
         val restoredBytesFromBinary = bytesOptional.fromBytes(bytesBinary.toByteArray())
         assertEquals(testBytes, restoredBytesFromBinary)
 
-        // Test timestamp
+        // Test instant
         val testTimestamp = Instant.parse("2025-08-25T12:00:00Z")
-        val timestampJson = timestampOptional.toJsonCode(testTimestamp)
-        val restoredTimestamp = timestampOptional.fromJsonCode(timestampJson)
+        val instantJson = instantOptional.toJsonCode(testTimestamp)
+        val restoredTimestamp = instantOptional.fromJsonCode(instantJson)
         assertEquals(testTimestamp, restoredTimestamp)
 
-        val timestampBytes = timestampOptional.toBytes(testTimestamp)
-        val restoredTimestampFromBytes = timestampOptional.fromBytes(timestampBytes.toByteArray())
+        val instantBytes = instantOptional.toBytes(testTimestamp)
+        val restoredTimestampFromBytes = instantOptional.fromBytes(instantBytes.toByteArray())
         assertEquals(testTimestamp, restoredTimestampFromBytes)
     }
 
@@ -630,7 +630,7 @@ class SerializersTest {
         val stringOptional = Serializers.optional(Serializers.string)
         val boolOptional = Serializers.optional(Serializers.bool)
         val bytesOptional = Serializers.optional(Serializers.bytes)
-        val timestampOptional = Serializers.optional(Serializers.timestamp)
+        val instantOptional = Serializers.optional(Serializers.instant)
 
         // Test null values in JSON
         val nullJson = intOptional.toJsonCode(null)
@@ -645,7 +645,7 @@ class SerializersTest {
         assertEquals(null, restoredNullFromBytes)
 
         // Test all types with null
-        listOf(intOptional, stringOptional, boolOptional, bytesOptional, timestampOptional).forEach { serializer ->
+        listOf(intOptional, stringOptional, boolOptional, bytesOptional, instantOptional).forEach { serializer ->
             @Suppress("UNCHECKED_CAST")
             val typedSerializer = serializer as Serializer<Any?>
 
@@ -662,7 +662,7 @@ class SerializersTest {
     @Test
     fun `test optional serializer json flavors`() {
         val intOptional = Serializers.optional(Serializers.int32)
-        val timestampOptional = Serializers.optional(Serializers.timestamp)
+        val instantOptional = Serializers.optional(Serializers.instant)
         val boolOptional = Serializers.optional(Serializers.bool)
 
         // Test non-null values with different flavors
@@ -671,13 +671,13 @@ class SerializersTest {
         val readableIntJson = intOptional.toJsonCode(testInt, JsonFlavor.READABLE)
         assertEquals(denseIntJson, readableIntJson) // Should be the same for int32
 
-        // Test timestamp with different flavors
+        // Test instant with different flavors
         val testTimestamp = Instant.parse("2025-08-25T12:00:00Z")
-        val denseTimestampJson = timestampOptional.toJsonCode(testTimestamp, JsonFlavor.DENSE)
-        val readableTimestampJson = timestampOptional.toJsonCode(testTimestamp, JsonFlavor.READABLE)
+        val denseTimestampJson = instantOptional.toJsonCode(testTimestamp, JsonFlavor.DENSE)
+        val readableTimestampJson = instantOptional.toJsonCode(testTimestamp, JsonFlavor.READABLE)
         // Dense should be a number, readable should be an object
-        assertTrue(denseTimestampJson.toLongOrNull() != null, "Dense timestamp should be a number")
-        assertTrue(readableTimestampJson.contains("unix_millis"), "Readable timestamp should contain unix_millis")
+        assertTrue(denseTimestampJson.toLongOrNull() != null, "Dense instant should be a number")
+        assertTrue(readableTimestampJson.contains("unix_millis"), "Readable instant should contain unix_millis")
 
         // Test bool with different flavors
         val testBool = true
@@ -757,10 +757,10 @@ class SerializersTest {
         // Test specific binary encodings
         val testCases =
             mapOf(
-                null to "736f6961ff", // Null should be encoded as 0xFF
-                0 to "736f696100", // Zero should be encoded normally (no 0xFF prefix)
-                42 to "736f69612a", // Regular value should be encoded normally
-                -1 to "736f6961ebff", // Negative value should be encoded normally
+                null to "736f6961ff",
+                0 to "736f696100",
+                42 to "736f69612a",
+                -1 to "736f6961ebff",
             )
 
         testCases.forEach { (value, expectedHex) ->
@@ -777,7 +777,7 @@ class SerializersTest {
         // While the API prevents double-optional, we can test complex scenarios
         val intOptional = Serializers.optional(Serializers.int32)
         val stringOptional = Serializers.optional(Serializers.string)
-        val timestampOptional = Serializers.optional(Serializers.timestamp)
+        val instantOptional = Serializers.optional(Serializers.instant)
 
         // Test combinations of optional serializers with different types
         val testScenarios =
@@ -786,8 +786,8 @@ class SerializersTest {
                 Triple(intOptional, null, 42),
                 Triple(stringOptional, "test", null),
                 Triple(stringOptional, null, "test"),
-                Triple(timestampOptional, Instant.parse("2025-08-25T12:00:00Z"), null),
-                Triple(timestampOptional, null, Instant.parse("2025-08-25T12:00:00Z")),
+                Triple(instantOptional, Instant.parse("2025-08-25T12:00:00Z"), null),
+                Triple(instantOptional, null, Instant.parse("2025-08-25T12:00:00Z")),
             )
 
         testScenarios.forEach { (serializer, value1, value2) ->
@@ -832,7 +832,7 @@ class SerializersTest {
                 "float64" to Serializers.optional(Serializers.float64),
                 "string" to Serializers.optional(Serializers.string),
                 "bytes" to Serializers.optional(Serializers.bytes),
-                "timestamp" to Serializers.optional(Serializers.timestamp),
+                "instant" to Serializers.optional(Serializers.instant),
             )
 
         val testValues =
@@ -845,7 +845,7 @@ class SerializersTest {
                 "float64" to listOf(0.0, 3.14159, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, null),
                 "string" to listOf("", "hello", "world", "🚀", null),
                 "bytes" to listOf(ByteString.EMPTY, "test".encodeUtf8(), null),
-                "timestamp" to listOf(Instant.EPOCH, Instant.parse("2025-08-25T12:00:00Z"), null),
+                "instant" to listOf(Instant.EPOCH, Instant.parse("2025-08-25T12:00:00Z"), null),
             )
 
         optionalSerializers.forEach { (typeName, serializer) ->
@@ -883,11 +883,11 @@ class SerializersTest {
     }
 
     @Test
-    fun `test array serializer with empty arrays`() {
-        // Test array serializers with empty arrays
-        val intArraySerializer = Serializers.array(Serializers.int32)
-        val stringArraySerializer = Serializers.array(Serializers.string)
-        val boolArraySerializer = Serializers.array(Serializers.bool)
+    fun `test list serializer with empty arrays`() {
+        // Test list serializers with empty arrays
+        val intArraySerializer = Serializers.list(Serializers.int32)
+        val stringArraySerializer = Serializers.list(Serializers.string)
+        val boolArraySerializer = Serializers.list(Serializers.bool)
 
         // Test empty arrays
         val emptyIntArray = emptyList<Int>()
@@ -927,9 +927,9 @@ class SerializersTest {
     }
 
     @Test
-    fun `test array serializer with small arrays`() {
-        val intArraySerializer = Serializers.array(Serializers.int32)
-        val stringArraySerializer = Serializers.array(Serializers.string)
+    fun `test list serializer with small arrays`() {
+        val intArraySerializer = Serializers.list(Serializers.int32)
+        val stringArraySerializer = Serializers.list(Serializers.string)
 
         // Test arrays with 1-3 elements (should use wire bytes 247-249)
         val singleIntArray = listOf(42)
@@ -970,8 +970,8 @@ class SerializersTest {
     }
 
     @Test
-    fun `test array serializer with large arrays`() {
-        val intArraySerializer = Serializers.array(Serializers.int32)
+    fun `test list serializer with large arrays`() {
+        val intArraySerializer = Serializers.list(Serializers.int32)
 
         // Test arrays with more than 3 elements (should use wire byte 250 + length prefix)
         val largeArray = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
@@ -997,17 +997,17 @@ class SerializersTest {
     }
 
     @Test
-    fun `test array serializer with different element types`() {
-        // Test array serializers with all primitive types
-        val boolArraySerializer = Serializers.array(Serializers.bool)
-        val int32ArraySerializer = Serializers.array(Serializers.int32)
-        val int64ArraySerializer = Serializers.array(Serializers.int64)
-        val uint64ArraySerializer = Serializers.array(Serializers.uint64)
-        val float32ArraySerializer = Serializers.array(Serializers.float32)
-        val float64ArraySerializer = Serializers.array(Serializers.float64)
-        val stringArraySerializer = Serializers.array(Serializers.string)
-        val bytesArraySerializer = Serializers.array(Serializers.bytes)
-        val timestampArraySerializer = Serializers.array(Serializers.timestamp)
+    fun `test list serializer with different element types`() {
+        // Test list serializers with all primitive types
+        val boolArraySerializer = Serializers.list(Serializers.bool)
+        val int32ArraySerializer = Serializers.list(Serializers.int32)
+        val int64ArraySerializer = Serializers.list(Serializers.int64)
+        val uint64ArraySerializer = Serializers.list(Serializers.uint64)
+        val float32ArraySerializer = Serializers.list(Serializers.float32)
+        val float64ArraySerializer = Serializers.list(Serializers.float64)
+        val stringArraySerializer = Serializers.list(Serializers.string)
+        val bytesArraySerializer = Serializers.list(Serializers.bytes)
+        val instantArraySerializer = Serializers.list(Serializers.instant)
 
         // Test data for each type
         val boolArray = listOf(true, false, true)
@@ -1018,7 +1018,7 @@ class SerializersTest {
         val float64Array = listOf(0.0, 1.0, -1.0, 3.14159, Double.NaN, Double.NEGATIVE_INFINITY)
         val stringArray = listOf("", "hello", "world", "🚀", "Hello, 世界!")
         val bytesArray = listOf(ByteString.EMPTY, "test".encodeUtf8(), "hello world".encodeUtf8())
-        val timestampArray = listOf(Instant.EPOCH, Instant.parse("2025-08-25T12:00:00Z"))
+        val instantArray = listOf(Instant.EPOCH, Instant.parse("2025-08-25T12:00:00Z"))
 
         val testCases =
             listOf(
@@ -1030,15 +1030,15 @@ class SerializersTest {
                 Triple(float64ArraySerializer, float64Array, "float64"),
                 Triple(stringArraySerializer, stringArray, "string"),
                 Triple(bytesArraySerializer, bytesArray, "bytes"),
-                Triple(timestampArraySerializer, timestampArray, "timestamp"),
+                Triple(instantArraySerializer, instantArray, "instant"),
             )
 
-        testCases.forEach { (serializer, array, typeName) ->
+        testCases.forEach { (serializer, list, typeName) ->
             @Suppress("UNCHECKED_CAST")
             val typedSerializer = serializer as Serializer<List<Any>>
 
             @Suppress("UNCHECKED_CAST")
-            val typedArray = array as List<Any>
+            val typedArray = list as List<Any>
 
             // JSON roundtrip
             val json = typedSerializer.toJsonCode(typedArray)
@@ -1046,18 +1046,18 @@ class SerializersTest {
 
             // Special handling for NaN values in float arrays
             if (typeName == "float32" || typeName == "float64") {
-                assertEquals(typedArray.size, restoredFromJson.size, "$typeName array size should match")
+                assertEquals(typedArray.size, restoredFromJson.size, "$typeName list size should match")
                 typedArray.zip(restoredFromJson).forEach { (original, restored) ->
                     if (original is Float && original.isNaN()) {
-                        assertTrue((restored as Float).isNaN(), "NaN should be preserved in float32 array")
+                        assertTrue((restored as Float).isNaN(), "NaN should be preserved in float32 list")
                     } else if (original is Double && original.isNaN()) {
-                        assertTrue((restored as Double).isNaN(), "NaN should be preserved in float64 array")
+                        assertTrue((restored as Double).isNaN(), "NaN should be preserved in float64 list")
                     } else {
-                        assertEquals(original, restored, "Array element should match for $typeName")
+                        assertEquals(original, restored, "List element should match for $typeName")
                     }
                 }
             } else {
-                assertEquals(typedArray, restoredFromJson, "JSON roundtrip failed for $typeName array")
+                assertEquals(typedArray, restoredFromJson, "JSON roundtrip failed for $typeName list")
             }
 
             // Binary roundtrip
@@ -1065,28 +1065,28 @@ class SerializersTest {
             val restoredFromBytes = typedSerializer.fromBytes(bytes.toByteArray())
 
             if (typeName == "float32" || typeName == "float64") {
-                assertEquals(typedArray.size, restoredFromBytes.size, "$typeName array size should match in binary")
+                assertEquals(typedArray.size, restoredFromBytes.size, "$typeName list size should match in binary")
                 typedArray.zip(restoredFromBytes).forEach { (original, restored) ->
                     if (original is Float && original.isNaN()) {
-                        assertTrue((restored as Float).isNaN(), "NaN should be preserved in float32 array binary")
+                        assertTrue((restored as Float).isNaN(), "NaN should be preserved in float32 list binary")
                     } else if (original is Double && original.isNaN()) {
-                        assertTrue((restored as Double).isNaN(), "NaN should be preserved in float64 array binary")
+                        assertTrue((restored as Double).isNaN(), "NaN should be preserved in float64 list binary")
                     } else {
-                        assertEquals(original, restored, "Array element should match for $typeName in binary")
+                        assertEquals(original, restored, "List element should match for $typeName in binary")
                     }
                 }
             } else {
-                assertEquals(typedArray, restoredFromBytes, "Binary roundtrip failed for $typeName array")
+                assertEquals(typedArray, restoredFromBytes, "Binary roundtrip failed for $typeName list")
             }
         }
     }
 
     @Test
-    fun `test nested array serializers`() {
-        val intArraySerializer = Serializers.array(Serializers.int32)
-        val nestedIntArraySerializer = Serializers.array(intArraySerializer)
+    fun `test nested list serializers`() {
+        val intArraySerializer = Serializers.list(Serializers.int32)
+        val nestedIntArraySerializer = Serializers.list(intArraySerializer)
 
-        // Test array of arrays
+        // Test list of arrays
         val nestedArray =
             listOf(
                 listOf(1, 2, 3),
@@ -1097,7 +1097,7 @@ class SerializersTest {
 
         // JSON roundtrip
         val json = nestedIntArraySerializer.toJsonCode(nestedArray)
-        assertTrue(json.startsWith("[[") || json.startsWith("[ ["), "Should be nested array structure")
+        assertTrue(json.startsWith("[[") || json.startsWith("[ ["), "Should be nested list structure")
         val restoredFromJson = nestedIntArraySerializer.fromJsonCode(json)
         assertEquals(nestedArray, restoredFromJson)
 
@@ -1108,7 +1108,7 @@ class SerializersTest {
         assertEquals(nestedArray, restoredFromBytes)
 
         // Test deeply nested arrays
-        val deeplyNestedArraySerializer = Serializers.array(nestedIntArraySerializer)
+        val deeplyNestedArraySerializer = Serializers.list(nestedIntArraySerializer)
         val deeplyNestedArray =
             listOf(
                 listOf(listOf(1, 2), listOf(3, 4)),
@@ -1125,11 +1125,11 @@ class SerializersTest {
     }
 
     @Test
-    fun `test array serializer with optional elements`() {
+    fun `test list serializer with optional elements`() {
         val optionalIntSerializer = Serializers.optional(Serializers.int32)
-        val optionalIntArraySerializer = Serializers.array(optionalIntSerializer)
+        val optionalIntArraySerializer = Serializers.list(optionalIntSerializer)
 
-        // Test array with optional elements (some null, some not)
+        // Test list with optional elements (some null, some not)
         val mixedArray = listOf(1, null, 42, null, 0)
 
         // JSON tests
@@ -1143,7 +1143,7 @@ class SerializersTest {
         val restoredFromBytes = optionalIntArraySerializer.fromBytes(bytes.toByteArray())
         assertEquals(mixedArray, restoredFromBytes)
 
-        // Test all null array
+        // Test all null list
         val allNullArray = listOf<Int?>(null, null, null)
         val allNullJson = optionalIntArraySerializer.toJsonCode(allNullArray)
         assertEquals("[null,null,null]", allNullJson)
@@ -1152,7 +1152,7 @@ class SerializersTest {
         val allNullBytes = optionalIntArraySerializer.toBytes(allNullArray)
         assertEquals(allNullArray, optionalIntArraySerializer.fromBytes(allNullBytes.toByteArray()))
 
-        // Test no null array
+        // Test no null list
         val noNullArray = listOf<Int?>(1, 2, 3)
         val noNullJson = optionalIntArraySerializer.toJsonCode(noNullArray)
         assertEquals("[1,2,3]", noNullJson)
@@ -1163,9 +1163,9 @@ class SerializersTest {
     }
 
     @Test
-    fun `test array serializer edge cases`() {
-        val intArraySerializer = Serializers.array(Serializers.int32)
-        val stringArraySerializer = Serializers.array(Serializers.string)
+    fun `test list serializer edge cases`() {
+        val intArraySerializer = Serializers.list(Serializers.int32)
+        val stringArraySerializer = Serializers.list(Serializers.string)
 
         // Test arrays with edge case values
         val edgeCaseIntArray = listOf(0, -1, 1, Int.MAX_VALUE, Int.MIN_VALUE, 232, 65536)
@@ -1182,7 +1182,7 @@ class SerializersTest {
         val stringBytes = stringArraySerializer.toBytes(edgeCaseStringArray)
         assertEquals(edgeCaseStringArray, stringArraySerializer.fromBytes(stringBytes.toByteArray()))
 
-        // Test very large array (boundary testing)
+        // Test very large list (boundary testing)
         val boundaryArray = (1..100).toList()
         val boundaryJson = intArraySerializer.toJsonCode(boundaryArray)
         assertEquals(boundaryArray, intArraySerializer.fromJsonCode(boundaryJson))
@@ -1202,30 +1202,29 @@ class SerializersTest {
     }
 
     @Test
-    fun `test array serializer binary format specifics`() {
-        val intArraySerializer = Serializers.array(Serializers.int32)
+    fun `test list serializer binary format specifics`() {
+        val intArraySerializer = Serializers.list(Serializers.int32)
 
-        // Test specific binary format expectations based on array size
+        // Test specific binary format expectations based on list size
         val testCases =
             mapOf(
-                emptyList<Int>() to "736f6961f6", // Empty: soia + 0xF6 (246)
-                listOf(1) to "736f6961f701", // 1 element: soia + 0xF7 (247) + elements
-                listOf(1, 2) to "736f6961f80102", // 2 elements: soia + 0xF8 (248) + elements
-                listOf(1, 2, 3) to "736f6961f9010203", // 3 elements: soia + 0xF9 (249) + elements
-                // 4+ elements should start with 0xFA (250) + length prefix
+                emptyList<Int>() to "736f6961f6",
+                listOf(1) to "736f6961f701",
+                listOf(1, 2) to "736f6961f80102",
+                listOf(1, 2, 3) to "736f6961f9010203",
             )
 
-        testCases.forEach { (array, expectedHexPrefix) ->
-            val bytes = intArraySerializer.toBytes(array)
-            if (array.size <= 3) {
-                assertEquals(expectedHexPrefix, bytes.hex(), "Binary encoding failed for array: $array")
+        testCases.forEach { (list, expectedHexPrefix) ->
+            val bytes = intArraySerializer.toBytes(list)
+            if (list.size <= 3) {
+                assertEquals(expectedHexPrefix, bytes.hex(), "Binary encoding failed for list: $list")
             } else {
-                assertTrue(bytes.hex().startsWith("736f6961fa"), "Large array should start with soia + 0xFA")
+                assertTrue(bytes.hex().startsWith("736f6961fa"), "Large list should start with soia + 0xFA")
             }
-            assertEquals(array, intArraySerializer.fromBytes(bytes.toByteArray()))
+            assertEquals(list, intArraySerializer.fromBytes(bytes.toByteArray()))
         }
 
-        // Test large array format
+        // Test large list format
         val largeArray = (1..10).toList()
         val largeBytes = intArraySerializer.toBytes(largeArray)
         assertTrue(largeBytes.hex().startsWith("736f6961fa0a"), "10 elements should be soia + 0xFA + 0x0A")
@@ -1233,8 +1232,8 @@ class SerializersTest {
     }
 
     @Test
-    fun `test array serializer performance with large arrays`() {
-        val intArraySerializer = Serializers.array(Serializers.int32)
+    fun `test list serializer performance with large arrays`() {
+        val intArraySerializer = Serializers.list(Serializers.int32)
 
         // Test with reasonably large arrays to ensure no stack overflow or performance issues
         val mediumArray = (1..1000).toList()
