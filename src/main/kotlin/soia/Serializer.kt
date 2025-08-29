@@ -11,7 +11,7 @@ enum class JsonFlavor {
 }
 
 class Serializer<T> internal constructor(
-    private val impl: SerializerImpl<T>,
+    internal val impl: SerializerImpl<T>,
 ) {
     fun toJson(
         input: T,

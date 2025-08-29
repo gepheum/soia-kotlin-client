@@ -3,16 +3,16 @@ package soia.internal
 import soia.IndexedList
 import java.util.Collections
 
-@Suppress("UNCHECKED_CAST")
 fun <M, E> toFrozenList(
     elements: Iterable<M>,
     toFrozen: (M) -> E,
 ): List<E> {
     return if (elements is FrozenList) {
+        @Suppress("UNCHECKED_CAST")
         elements as List<E>
     } else {
         val result = FrozenList(elements.map(toFrozen))
-        if (result.isEmpty()) result else emptyFrozenList()
+        if (result.isEmpty()) emptyFrozenList() else result
     }
 }
 
@@ -31,7 +31,7 @@ fun <M, E, K> toIndexedList(
         elements as IndexedList<E, K>
     } else {
         val result = IndexedListImpl(elements.map(toFrozen), getKeySpec, getKey)
-        if (result.isEmpty()) result else emptyIndexedList()
+        if (result.isEmpty()) emptyIndexedList() else result
     }
 }
 
@@ -63,6 +63,10 @@ private open class FrozenList<E>(
         toIndex: Int,
     ): List<E> {
         return FrozenList(list.subList(fromIndex, toIndex))
+    }
+
+    override fun toString(): String {
+        return this.list.toString()
     }
 }
 

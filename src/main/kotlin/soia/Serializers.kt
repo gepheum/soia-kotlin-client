@@ -1,12 +1,6 @@
 package soia
 
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.double
-import kotlinx.serialization.json.float
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
@@ -22,6 +16,20 @@ object Serializers {
     val string: Serializer<String> = Serializer(StringSerializer)
     val bytes: Serializer<ByteString> = Serializer(BytesSerializer)
     val timestamp: Serializer<Instant> = Serializer(TimestampSerializer)
+
+    fun <T> optional(other: Serializer<T>): Serializer<T?> {
+        val otherImpl = other.impl
+        return if (otherImpl is OptionalSerializer<*>) {
+            @Suppress("UNCHECKED_CAST")
+            other as Serializer<T?>
+        } else {
+            Serializer(OptionalSerializer(otherImpl))
+        }
+    }
+
+    fun <E> array(item: Serializer<E>): Serializer<List<E>> {
+        return Serializer(ArraySerializer(item.impl))
+    }
 }
 
 private fun decodeNumber(buffer: Buffer): Number {
@@ -151,8 +159,8 @@ private object Int32Serializer : SerializerImpl<Int> {
     }
 }
 
-private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740992; // -(2 ^ 53)
-private const val MAX_SAFE_JAVASCRIPT_INT = 9007199254740992; // -(2 ^ 53)
+private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740992 // -(2 ^ 53)
+private const val MAX_SAFE_JAVASCRIPT_INT = 9007199254740992 // -(2 ^ 53)
 
 private object Int64Serializer : SerializerImpl<Long> {
     override fun isDefault(value: Long): Boolean {
@@ -365,10 +373,12 @@ private object StringSerializer : SerializerImpl<String> {
 
     override fun fromJson(json: JsonElement): String {
         val jsonPrimitive = json.jsonPrimitive
-        return if ((0) == jsonPrimitive.intOrNull) {
+        return if (jsonPrimitive.isString) {
+            jsonPrimitive.content
+        } else if (jsonPrimitive.intOrNull == 0) {
             ""
         } else {
-            jsonPrimitive.content
+            throw IllegalArgumentException("Expected: string")
         }
     }
 }
@@ -412,10 +422,12 @@ private object BytesSerializer : SerializerImpl<ByteString> {
 
     override fun fromJson(json: JsonElement): ByteString {
         val jsonPrimitive = json.jsonPrimitive
-        return if ((0) == jsonPrimitive.intOrNull) {
+        return if (jsonPrimitive.isString) {
+            jsonPrimitive.content.decodeBase64()!!
+        } else if (jsonPrimitive.intOrNull == 0) {
             ByteString.EMPTY
         } else {
-            jsonPrimitive.content.decodeBase64()!!
+            throw IllegalArgumentException("Expected: base64 string")
         }
     }
 }
@@ -469,5 +481,107 @@ private object TimestampSerializer : SerializerImpl<Instant> {
 
     fun clampUnixMillis(unixMillis: Long): Long {
         return unixMillis.coerceIn(-8640000000000000, 8640000000000000)
+    }
+}
+
+private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerImpl<T?> {
+    override fun isDefault(value: T?): Boolean {
+        return value == null
+    }
+
+    override fun encode(
+        input: T?,
+        buffer: Buffer,
+    ) {
+        if (input == null) {
+            buffer.writeByte(255)
+        } else {
+            this.other.encode(input, buffer)
+        }
+    }
+
+    override fun decode(buffer: Buffer): T? {
+        return if (buffer.peek().readByte().toInt() and 0xFF == 255) {
+            buffer.skip(1)
+            null
+        } else {
+            this.other.decode(buffer)
+        }
+    }
+
+    override fun toJson(
+        input: T?,
+        flavor: JsonFlavor,
+    ): JsonElement {
+        return if (input == null) {
+            JsonNull
+        } else {
+            this.other.toJson(input, flavor)
+        }
+    }
+
+    override fun fromJson(json: JsonElement): T? {
+        return if (json is JsonNull) {
+            null
+        } else {
+            this.other.fromJson(json)
+        }
+    }
+}
+
+private class ArraySerializer<E>(val item: SerializerImpl<E>) : SerializerImpl<List<E>> {
+    override fun isDefault(value: List<E>): Boolean {
+        return value.isEmpty()
+    }
+
+    override fun encode(
+        input: List<E>,
+        buffer: Buffer,
+    ) {
+        val size = input.size
+        if (size <= 3) {
+            buffer.writeByte(246 + size)
+        } else {
+            buffer.writeByte(250)
+            encodeLengthPrefix(size, buffer)
+        }
+        var numItems = 0
+        for (item in input) {
+            this.item.encode(item, buffer)
+            numItems++
+        }
+        if (numItems != size) {
+            throw IllegalArgumentException("Expected: $size items; got: $numItems")
+        }
+    }
+
+    override fun decode(buffer: Buffer): List<E> {
+        val wire = buffer.readByte().toInt() and 0xFF
+        if (wire == 0 || wire == 246) {
+            return soia.internal.emptyFrozenList()
+        }
+        val size = if (wire == 250) decodeNumber(buffer).toInt() else wire - 246
+        val items = mutableListOf<E>()
+        for (i in 0 until size) {
+            items.add(item.decode(buffer))
+        }
+        return soia.internal.toFrozenList(items)
+    }
+
+    override fun toJson(
+        input: List<E>,
+        flavor: JsonFlavor,
+    ): JsonElement {
+        return JsonArray(
+            input.map { item.toJson(it, flavor) },
+        )
+    }
+
+    override fun fromJson(json: JsonElement): List<E> {
+        return if (json is JsonPrimitive && 0 == json.intOrNull) {
+            soia.internal.emptyFrozenList()
+        } else {
+            soia.internal.toFrozenList(json.jsonArray.map { item.fromJson(it) })
+        }
     }
 }
