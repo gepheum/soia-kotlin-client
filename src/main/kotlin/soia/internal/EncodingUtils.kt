@@ -1,6 +1,10 @@
 package soia.internal
 
 import okio.Buffer
+import okio.BufferedSource
+import okio.ForwardingSource
+import okio.Source
+import okio.buffer
 
 fun encodeInt32(
     input: Int,
@@ -60,7 +64,7 @@ fun encodeLengthPrefix(
     }
 }
 
-fun decodeNumber(buffer: Buffer): Number {
+fun decodeNumber(buffer: BufferedSource): Number {
     return when (val wire = buffer.readByte().toInt() and 0xFF) {
         in 0..231 -> wire
         232 -> buffer.readShortLe().toInt() and 0xFFFF // uint16
@@ -77,7 +81,7 @@ fun decodeNumber(buffer: Buffer): Number {
     }
 }
 
-fun decodeUnused(buffer: Buffer) {
+fun decodeUnused(buffer: BufferedSource) {
     val wire = buffer.readByte().toInt() and 0xFF
     if (wire < 232) {
         return
@@ -119,4 +123,22 @@ fun decodeUnused(buffer: Buffer) {
             }
         }
     }
+}
+
+class CountingSource(delegate: Source) : ForwardingSource(delegate) {
+    var bytesRead = 0L
+        private set
+
+    override fun read(
+        sink: Buffer,
+        byteCount: Long,
+    ): Long {
+        val result = super.read(sink, byteCount)
+        if (result != -1L) {
+            bytesRead += result
+        }
+        return result
+    }
+
+    val buffer = buffer()
 }

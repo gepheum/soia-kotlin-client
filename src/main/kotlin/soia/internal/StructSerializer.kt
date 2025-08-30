@@ -2,11 +2,11 @@ package soia.internal
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import okio.Buffer
+import okio.BufferedSource
 import soia.Serializer
 
 class StructSerializer<Frozen, Mutable>(
@@ -52,7 +52,7 @@ class StructSerializer<Frozen, Mutable>(
 
         internal fun decodeValue(
             mutable: Mutable,
-            buffer: Buffer,
+            buffer: BufferedSource,
             keepUnrecognizedFields: Boolean,
         ) {
             val value = serializer.impl.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
@@ -106,10 +106,9 @@ class StructSerializer<Frozen, Mutable>(
         return if (value === defaultInstance) {
             true
         } else {
-            // TODO: look at unknown fields
             fields.all {
                 it.valueIsDefault(value)
-            }
+            } && getUnrecognizedFields(value) == null
         }
     }
 
@@ -259,7 +258,7 @@ class StructSerializer<Frozen, Mutable>(
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Frozen {
         val wire = buffer.readByte().toInt() and 0xFF
@@ -288,7 +287,7 @@ class StructSerializer<Frozen, Mutable>(
             if (keepUnrecognizedFields) {
                 val peekBuffer = buffer.peek()
                 for (i in recognizedSlotCount until encodedSlotCount) {
-                    decodeUnused(peekBuffer.buffer)
+                    decodeUnused(peekBuffer)
                 }
                 val unrecognizedByteCount = peekBuffer.buffer.size
                 val unrecognizedBytes = buffer.readByteString(unrecognizedByteCount)
@@ -334,7 +333,7 @@ class StructSerializer<Frozen, Mutable>(
                 is JsonObject -> {
                     JsonObject(input.mapValues { copyJson(it.value) }.toMap())
                 }
-                is JsonPrimitive, is JsonNull -> {
+                is JsonPrimitive -> {
                     input
                 }
             }

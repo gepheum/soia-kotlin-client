@@ -2,6 +2,7 @@ package soia.internal
 
 import kotlinx.serialization.json.JsonElement
 import okio.Buffer
+import okio.BufferedSource
 
 interface SerializerImpl<T> {
     fun isDefault(value: T): Boolean
@@ -22,7 +23,7 @@ interface SerializerImpl<T> {
     )
 
     fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean = false,
     ): T
 }

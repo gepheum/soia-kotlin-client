@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import okio.Buffer
+import okio.BufferedSource
 import soia.IndexedList
 import soia.Serializer
 
@@ -50,7 +51,7 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): L {
         val wire = buffer.readByte().toInt() and 0xFF

@@ -9,6 +9,7 @@ import kotlinx.serialization.json.float
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import okio.Buffer
+import okio.BufferedSource
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
 import soia.internal.SerializerImpl
@@ -57,7 +58,7 @@ private object BoolSerializer : SerializerImpl<Boolean> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Boolean {
         return decodeNumber(buffer).toInt() != 0
@@ -100,7 +101,7 @@ private object Int32Serializer : SerializerImpl<Int> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Int {
         return decodeNumber(buffer).toInt()
@@ -142,7 +143,7 @@ private object Int64Serializer : SerializerImpl<Long> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Long {
         return decodeNumber(buffer).toLong()
@@ -197,7 +198,7 @@ private object Uint64Serializer : SerializerImpl<ULong> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): ULong {
         return decodeNumber(buffer).toLong().toULong()
@@ -240,7 +241,7 @@ private object Float32Serializer : SerializerImpl<Float> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Float {
         return decodeNumber(buffer).toFloat()
@@ -288,7 +289,7 @@ private object Float64Serializer : SerializerImpl<Double> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Double {
         return decodeNumber(buffer).toDouble()
@@ -339,7 +340,7 @@ private object StringSerializer : SerializerImpl<String> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): String {
         val wire = buffer.readByte().toInt() and 0xFF
@@ -395,7 +396,7 @@ private object BytesSerializer : SerializerImpl<ByteString> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): ByteString {
         val wire = buffer.readByte().toInt() and 0xFF
@@ -449,7 +450,7 @@ private object InstantSerializer : SerializerImpl<Instant> {
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Instant {
         val unixMillis = clampUnixMillis(decodeNumber(buffer).toLong())
@@ -504,7 +505,7 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): T? {
         return if (buffer.peek().readByte().toInt() and 0xFF == 255) {

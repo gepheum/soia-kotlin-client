@@ -7,6 +7,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import okio.Buffer
+import okio.BufferedSource
+import okio.buffer
 import soia.Serializer
 
 class EnumSerializer<Enum : Any> private constructor(
@@ -28,15 +30,12 @@ class EnumSerializer<Enum : Any> private constructor(
         ),
     ) {}
 
-    init {
-        addFieldImpl(unknown)
-    }
-
     fun addConstantField(
         number: Int,
         name: String,
         instance: Enum,
     ) {
+        checkNotFinalized()
         addFieldImpl(ConstantField(number, name, instance.javaClass, instance))
     }
 
@@ -48,11 +47,13 @@ class EnumSerializer<Enum : Any> private constructor(
         wrap: (T) -> Instance,
         getValue: (Instance) -> T,
     ) {
+        checkNotFinalized()
         @Suppress("UNCHECKED_CAST")
         addFieldImpl(ValueField(number, name, instanceType, valueSerializer, wrap, getValue as (Enum) -> T))
     }
 
-    fun addRemovedField(number: Int) {
+    fun addRemovedNumber(number: Int) {
+        checkNotFinalized()
         numberToField[number] = RemovedNumber(number)
     }
 
@@ -181,7 +182,7 @@ class EnumSerializer<Enum : Any> private constructor(
 
             internal fun <Enum, T> wrapDecoded(
                 field: ValueField<Enum, T>,
-                buffer: Buffer,
+                buffer: BufferedSource,
                 keepUnrecognizedFields: Boolean,
             ): Enum {
                 val value = field.valueSerializer.impl.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
@@ -202,6 +203,7 @@ class EnumSerializer<Enum : Any> private constructor(
 
     fun finalizeEnum() {
         checkNotFinalized()
+        addFieldImpl(unknown)
         finalized = true
     }
 
@@ -217,7 +219,7 @@ class EnumSerializer<Enum : Any> private constructor(
     private var finalized = false
 
     override fun isDefault(value: Enum): Boolean {
-        return value === unknown
+        return value === unknown.instance
     }
 
     override fun toJson(
@@ -299,15 +301,16 @@ class EnumSerializer<Enum : Any> private constructor(
     }
 
     override fun decode(
-        buffer: Buffer,
+        buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Enum {
-        val peekBuffer = buffer.peek().buffer
-        val wire = peekBuffer.readByte().toInt() and 0xFF
+        var peekBuffer = CountingSource(buffer.peek())
+        val wire = peekBuffer.buffer.readByte().toInt() and 0xFF
         val resultOrNull: Enum?
         if (wire < 242) {
-            // A number
-            val number = decodeNumber(peekBuffer).toInt()
+            // A number: rewind
+            peekBuffer = CountingSource(buffer.peek())
+            val number = decodeNumber(peekBuffer.buffer).toInt()
             resultOrNull =
                 when (val field = numberToField[number]) {
                     is RemovedNumber -> unknown.instance
@@ -317,16 +320,16 @@ class EnumSerializer<Enum : Any> private constructor(
                     null -> null
                 }
         } else {
-            val number = if (wire == 248) decodeNumber(peekBuffer).toInt() else wire - 250
+            val number = if (wire == 248) decodeNumber(peekBuffer.buffer).toInt() else wire - 250
             resultOrNull =
                 when (val field = numberToField[number]) {
                     is RemovedNumber -> unknown.instance
                     is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
-                    is ValueField<Enum, *> -> ValueField.wrapDecoded(field, peekBuffer, keepUnrecognizedFields = keepUnrecognizedFields)
+                    is ValueField<Enum, *> -> ValueField.wrapDecoded(field, peekBuffer.buffer, keepUnrecognizedFields = keepUnrecognizedFields)
                     null -> null
                 }
         }
-        val byteCount = peekBuffer.size - buffer.size
+        val byteCount = peekBuffer.bytesRead
         val result: Enum
         if (resultOrNull == null) {
             if (keepUnrecognizedFields) {
