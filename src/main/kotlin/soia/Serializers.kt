@@ -11,7 +11,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
+import soia.internal.SerializerImpl
 import soia.internal.decodeNumber
+import soia.internal.encodeInt32
 import soia.internal.encodeLengthPrefix
 import soia.internal.listSerializer
 import java.time.Instant
@@ -94,35 +96,7 @@ private object Int32Serializer : SerializerImpl<Int> {
         input: Int,
         buffer: Buffer,
     ) {
-        when {
-            input < 0 -> {
-                when {
-                    input >= -256 -> {
-                        buffer.writeByte(235)
-                        buffer.writeByte((input + 256))
-                    }
-                    input >= -65536 -> {
-                        buffer.writeByte(236)
-                        buffer.writeShortLe((input + 65536))
-                    }
-                    else -> {
-                        buffer.writeByte(237)
-                        buffer.writeIntLe(input)
-                    }
-                }
-            }
-            input < 232 -> {
-                buffer.writeByte(input)
-            }
-            input < 65536 -> {
-                buffer.writeByte(232)
-                buffer.writeShortLe(input)
-            }
-            else -> {
-                buffer.writeByte(233)
-                buffer.writeIntLe(input)
-            }
-        }
+        encodeInt32(input, buffer)
     }
 
     override fun decode(

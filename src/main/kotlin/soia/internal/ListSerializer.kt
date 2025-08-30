@@ -8,7 +8,6 @@ import kotlinx.serialization.json.jsonArray
 import okio.Buffer
 import soia.IndexedList
 import soia.Serializer
-import soia.SerializerImpl
 
 fun <E> listSerializer(item: Serializer<E>): Serializer<List<E>> {
     return Serializer(ListSerializer(item.impl))

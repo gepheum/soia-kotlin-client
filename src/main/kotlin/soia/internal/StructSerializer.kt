@@ -8,7 +8,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import okio.Buffer
 import soia.Serializer
-import soia.SerializerImpl
 
 class StructSerializer<Frozen, Mutable>(
     private val defaultInstance: Frozen,

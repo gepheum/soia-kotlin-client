@@ -2,6 +2,41 @@ package soia.internal
 
 import okio.Buffer
 
+fun encodeInt32(
+    input: Int,
+    buffer: Buffer,
+) {
+    when {
+        input < 0 -> {
+            when {
+                input >= -256 -> {
+                    buffer.writeByte(235)
+                    buffer.writeByte((input + 256))
+                }
+                input >= -65536 -> {
+                    buffer.writeByte(236)
+                    buffer.writeShortLe((input + 65536))
+                }
+                else -> {
+                    buffer.writeByte(237)
+                    buffer.writeIntLe(input)
+                }
+            }
+        }
+        input < 232 -> {
+            buffer.writeByte(input)
+        }
+        input < 65536 -> {
+            buffer.writeByte(232)
+            buffer.writeShortLe(input)
+        }
+        else -> {
+            buffer.writeByte(233)
+            buffer.writeIntLe(input)
+        }
+    }
+}
+
 fun encodeLengthPrefix(
     length: Int,
     buffer: Buffer,

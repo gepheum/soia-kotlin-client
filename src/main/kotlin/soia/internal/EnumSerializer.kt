@@ -1,89 +1,203 @@
 package soia.internal
 
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import okio.Buffer
 import soia.Serializer
-import soia.SerializerImpl
 
-class EnumSerializer<Enum: Any>(
-    private val default: Enum,
-    private val wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Enum,
+class EnumSerializer<Enum : Any> private constructor(
+    private val unknown: UnknownField<Enum>,
 ) : SerializerImpl<Enum> {
-    sealed class Field<Enum> {
+    class UnknownSpec<Enum, Instance : Enum>(
+        internal val instance: Instance,
+        internal val wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Instance,
+        internal val getUnrecognized: (Instance) -> UnrecognizedEnum<Enum>?,
+    )
+
+    @Suppress("UNCHECKED_CAST")
+    constructor(unknown: UnknownSpec<Enum, *>) : this(
+        UnknownField<Enum>(
+            unknown.javaClass as Class<out Enum>,
+            unknown.instance as Enum,
+            unknown.wrapUnrecognized as (UnrecognizedEnum<Enum>) -> Enum,
+            unknown.getUnrecognized as (Enum) -> UnrecognizedEnum<Enum>?,
+        ),
+    ) {}
+
+    init {
+        addFieldImpl(unknown)
+    }
+
+    fun addConstantField(
+        number: Int,
+        name: String,
+        instance: Enum,
+    ) {
+        addFieldImpl(ConstantField(number, name, instance.javaClass, instance))
+    }
+
+    fun <Instance : Enum, T> addValueField(
+        number: Int,
+        name: String,
+        instanceType: Class<Instance>,
+        valueSerializer: Serializer<T>,
+        wrap: (T) -> Instance,
+        getValue: (Instance) -> T,
+    ) {
+        @Suppress("UNCHECKED_CAST")
+        addFieldImpl(ValueField(number, name, instanceType, valueSerializer, wrap, getValue as (Enum) -> T))
+    }
+
+    fun addRemovedField(number: Int) {
+        numberToField[number] = RemovedNumber(number)
+    }
+
+    private sealed class FieldOrRemoved<Enum> {
         abstract val number: Int
     }
 
-    data class ConstantField<Enum, Instance : Enum>(
-        override val number: Int,
-        val name: String,
-        val instanceType: Class<Instance>,
-        val instance: Instance,
-    ): Field<Enum>() {
-        companion object {
-            internal  fun <Enum, Instance : Enum> getInstance(field: ConstantField<Enum, Instance>): Instance {
-                return field.instance
-            }
+    private sealed class Field<Enum> : FieldOrRemoved<Enum>() {
+        abstract val name: String
+        abstract val instanceType: Class<out Enum>
 
-            internal  fun <Enum, Instance : Enum> toJson(field: ConstantField<Enum, Instance>, readableFlavor: Boolean): JsonElement {
-                return if (readableFlavor) JsonPrimitive(field.name) else JsonPrimitive(field.number)
+        abstract fun toJson(
+            input: Enum,
+            readableFlavor: Boolean,
+        ): JsonElement
+
+        abstract fun encode(
+            input: Enum,
+            buffer: Buffer,
+        )
+    }
+
+    private class UnknownField<Enum>(
+        override val instanceType: Class<out Enum>,
+        val instance: Enum,
+        val wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Enum,
+        private val getUnrecognized: (Enum) -> UnrecognizedEnum<Enum>?,
+    ) : Field<Enum>() {
+        override val number get() = 0
+        override val name get() = "?"
+
+        override fun toJson(
+            input: Enum,
+            readableFlavor: Boolean,
+        ): JsonElement {
+            return if (readableFlavor) {
+                JsonPrimitive("?")
+            } else {
+                val unrecognized = getUnrecognized(input)?.jsonElement
+                unrecognized ?: JsonPrimitive(0)
+            }
+        }
+
+        override fun encode(
+            input: Enum,
+            buffer: Buffer,
+        ) {
+            val unrecognized = getUnrecognized(input)?.bytes
+            if (unrecognized != null) {
+                buffer.write(unrecognized)
+            } else {
+                buffer.writeByte(0)
             }
         }
     }
 
-    data class ValueField<Enum, Instance : Enum, T>(
+    private class ConstantField<Enum, Instance : Enum>(
         override val number: Int,
-        val name: String,
-        val instanceType: Class<Instance>,
+        override val name: String,
+        override val instanceType: Class<Instance>,
+        val instance: Enum,
+    ) : Field<Enum>() {
+        override fun toJson(
+            input: Enum,
+            readableFlavor: Boolean,
+        ): JsonElement {
+            return if (readableFlavor) JsonPrimitive(name) else JsonPrimitive(number)
+        }
+
+        override fun encode(
+            input: Enum,
+            buffer: Buffer,
+        ) {
+            encodeInt32(number, buffer)
+        }
+    }
+
+    private class ValueField<Enum, T>(
+        override val number: Int,
+        override val name: String,
+        override val instanceType: Class<out Enum>,
         val valueSerializer: Serializer<T>,
-        val wrap: (T) -> Instance,
-        val getValue: (Instance) -> T,
-    ): Field<Enum>() {
+        val wrap: (T) -> Enum,
+        val getValue: (Enum) -> T,
+    ) : Field<Enum>() {
+        override fun toJson(
+            input: Enum,
+            readableFlavor: Boolean,
+        ): JsonElement {
+            val value = getValue(input)
+            val valueToJson = valueSerializer.toJson(value)
+            return if (readableFlavor) {
+                JsonObject(
+                    mapOf(
+                        "kind" to JsonPrimitive(name),
+                        "value" to valueToJson,
+                    ),
+                )
+            } else {
+                JsonArray(listOf(JsonPrimitive(number), valueToJson))
+            }
+        }
+
+        override fun encode(
+            input: Enum,
+            buffer: Buffer,
+        ) {
+            val value = getValue(input)
+            if (number < 5) {
+                buffer.writeByte(250 + number)
+            } else {
+                buffer.writeByte(248)
+                encodeInt32(number, buffer)
+            }
+            valueSerializer.impl.encode(value, buffer)
+        }
+
         companion object {
-            internal  fun <Enum, Instance : Enum, T> wrapFromJson(field: ValueField<Enum, Instance, T>, json: JsonElement): Instance {
+            internal fun <Enum, T> wrapFromJson(
+                field: ValueField<Enum, T>,
+                json: JsonElement,
+            ): Enum {
                 val value = field.valueSerializer.fromJson(json)
                 return field.wrap(value)
             }
 
-            internal fun <Enum, Instance : Enum, T> toJson(field: ValueField<Enum, Instance, T>, input: Enum, readableFlavor: Boolean): JsonElement {
-                @Suppress("UNCHECKED_CAST")
-                val value = field.getValue(input as Instance)
-                val valueToJson = field.valueSerializer.toJson(value)
-                return if (readableFlavor) {JsonObject(mapOf(
-                    "kind" to JsonPrimitive(field.name),
-                    "value" to valueToJson,
-                ))} else {JsonArray(listOf(JsonPrimitive(field.number), valueToJson))}
+            internal fun <Enum, T> wrapDecoded(
+                field: ValueField<Enum, T>,
+                buffer: Buffer,
+                keepUnrecognizedFields: Boolean,
+            ): Enum {
+                val value = field.valueSerializer.impl.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
+                return field.wrap(value)
             }
         }
     }
 
-    data class RemovedField<Enum>(
+    private class RemovedNumber<Enum>(
         override val number: Int,
-    ): Field<Enum>() {}
+    ) : FieldOrRemoved<Enum>()
 
-    fun addField(field: Field<Enum>) {
-        when (field) {
-            is ConstantField<Enum, *> -> addFieldImpl(field)
-            is ValueField<Enum, *, *> -> addFieldImpl(field)
-            is RemovedField<Enum> -> addFieldImpl(field)
-        }
-    }
-
-    private fun <Instance: Enum> addFieldImpl(field: ConstantField<Enum, Instance>) {
+    private fun addFieldImpl(field: Field<Enum>) {
         numberToField[field.number] = field
-        constantFields.add(field)
         nameToField[field.name] = field
         instanceTypeToField[field.instanceType] = field
-    }
-
-    private fun <Instance: Enum> addFieldImpl(field: ValueField<Enum, Instance, *>) {
-        numberToField[field.number] = field
-        valueFields.add(field)
-        nameToField[field.name] = field
-        instanceTypeToField[field.instanceType] = field
-    }
-
-    private fun addFieldImpl(field: RemovedField<Enum>) {
-        numberToField[field.number] = field
     }
 
     fun finalizeEnum() {
@@ -97,163 +211,135 @@ class EnumSerializer<Enum: Any>(
         }
     }
 
-    private val constantFields = mutableListOf<ConstantField<Enum, *>>()
-    private val valueFields = mutableListOf<ValueField<Enum, *, *>>()
-    private val numberToField = mutableMapOf<Int, Field<Enum>>()
+    private val numberToField = mutableMapOf<Int, FieldOrRemoved<Enum>>()
     private val nameToField = mutableMapOf<String, Field<Enum>>()
     private val instanceTypeToField = mutableMapOf<Class<out Enum>, Field<Enum>>()
     private var finalized = false
 
     override fun isDefault(value: Enum): Boolean {
-        return value === default
+        return value === unknown
     }
 
-    override fun toJson(input: Enum, readableFlavor: Boolean): JsonElement {
-        return when (val field = instanceTypeToField[input.javaClass]!!) {
-            is ConstantField<Enum, *> -> ConstantField.toJson(field, readableFlavor = readableFlavor)
-            is ValueField<Enum, *, *> -> ValueField.toJson(field, input, readableFlavor = readableFlavor)
-            is RemovedField<Enum> -> throw AssertionError()
-        }
+    override fun toJson(
+        input: Enum,
+        readableFlavor: Boolean,
+    ): JsonElement {
+        val field = instanceTypeToField[input.javaClass]!!
+        return field.toJson(input, readableFlavor = readableFlavor)
     }
 
-    override fun fromJson(json: JsonElement, keepUnrecognizedFields: Boolean): Enum {
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): Enum {
         return when (json) {
             is JsonPrimitive -> {
                 val number = json.intOrNull
-                val field = if (number != null) {
-                    numberToField[number]
-                } else {
-                    nameToField[json.content]
-                }
-                when (field) {
-                    is ConstantField<Enum, *> -> ConstantField.getInstance(field)
-                    is RemovedField<Enum> -> default
-                    is ValueField<Enum, *, *> -> throw IllegalArgumentException("${field.number} refers to a value field")
-                    null -> if (number != null) {
-                        wrapUnrecognized(UnrecognizedEnum(json))
+                val field =
+                    if (number != null) {
+                        numberToField[number]
                     } else {
-                        default
+                        nameToField[json.content]
                     }
+                when (field) {
+                    is UnknownField<Enum> -> unknown.instance
+                    is ConstantField<Enum, *> -> field.instance
+                    is RemovedNumber<Enum> -> unknown.instance
+                    is ValueField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a value field")
+                    null ->
+                        if (keepUnrecognizedFields && number != null) {
+                            unknown.wrapUnrecognized(UnrecognizedEnum(json))
+                        } else {
+                            unknown.instance
+                        }
                 }
             }
             is JsonArray -> {
                 val first = json[0].jsonPrimitive
                 val number = first.intOrNull
-                val field = if (number != null) {
-                    numberToField[number]
-                } else {
-                    nameToField[first.content]
-                }
+                val field =
+                    if (number != null) {
+                        numberToField[number]
+                    } else {
+                        nameToField[first.content]
+                    }
                 return when (field) {
-                    is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
-                    is RemovedField<Enum> -> default
-                    is ValueField<Enum, *, *> -> {
+                    is UnknownField<Enum>, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
+                    is RemovedNumber<Enum> -> unknown.instance
+                    is ValueField<Enum, *> -> {
                         val second = json[1]
                         ValueField.wrapFromJson(field, second)
                     }
-                    null -> if (number != null) {
-                        wrapUnrecognized(UnrecognizedEnum(json))
-                    } else {
-                        default
-                    }
+                    null ->
+                        if (number != null) {
+                            unknown.wrapUnrecognized(UnrecognizedEnum(json))
+                        } else {
+                            unknown.instance
+                        }
                 }
             }
             is JsonObject -> {
                 val name = json["kind"]!!.jsonPrimitive.content
                 val value = json["value"]!!
                 return when (val field = nameToField[name]) {
-                    is ConstantField<Enum, *> -> throw IllegalArgumentException("$name refers to a constant field")
-                    is RemovedField<Enum> -> default
-                    is ValueField<Enum, *, *> -> ValueField.wrapFromJson(field, value)
-                    null -> default
+                    is UnknownField<Enum>, is ConstantField<Enum, *> -> throw IllegalArgumentException("$name refers to a constant field")
+                    is ValueField<Enum, *> -> ValueField.wrapFromJson(field, value)
+                    null -> unknown.instance
                 }
             }
         }
     }
 
-    override fun encode(input: Enum, buffer: Buffer) {
-        const unrecognized = //
-        (input as AnyRecord)["^"] as UnrecognizedEnum | undefined;
-        if (
-            unrecognized &&
-            unrecognized.bytes &&
-            unrecognized.token === this.token
-        ) {
-            // Unrecognized field.
-            stream.putBytes(unrecognized.bytes);
-            return;
-        }
-        const kind = (input as AnyRecord).kind as string;
-        if (kind === "?") {
-            stream.writeUint8(0);
-            return;
-        }
-        const field = this.fieldMapping[kind]!;
-        const { number, serializer } = field;
-        if (serializer) {
-            // A value field.
-            const value = (input as AnyRecord).value;
-            if (number < 5) {
-                // The number can't be 0 or else kind == "?".
-                stream.writeUint8(250 + number);
-            } else {
-                stream.writeUint8(248);
-                encodeUint32(number, stream);
-            }
-            serializer.encode(value, stream);
-        } else {
-            // A constant field.
-            encodeUint32(number, stream);
-        }
+    override fun encode(
+        input: Enum,
+        buffer: Buffer,
+    ) {
+        val field = instanceTypeToField[input.javaClass]!!
+        field.encode(input, buffer)
     }
 
-    override fun decode(buffer: Buffer, keepUnrecognizedFields: Boolean): Enum {
-        const startOffset = stream.offset;
-        const wire = stream.dataView.getUint8(startOffset);
+    override fun decode(
+        buffer: Buffer,
+        keepUnrecognizedFields: Boolean,
+    ): Enum {
+        val peekBuffer = buffer.peek().buffer
+        val wire = peekBuffer.readByte().toInt() and 0xFF
+        val resultOrNull: Enum?
         if (wire < 242) {
             // A number
-            const number = decodeNumber(stream) as number;
-            const field = this.fieldMapping[number];
-            if (!field) {
-                // Check if the field was removed, in which case we want to return
-                // UNKNOWN, or is unrecognized.
-                if (!stream.keepUnrecognizedFields || this.removedNumbers.has(number)) {
-                    return this.defaultValue;
-                } else {
-                    const { offset } = stream;
-                    const bytes = ByteString.sliceOf(stream.buffer, startOffset, offset);
-                    return this.createFn(
-                        new UnrecognizedEnum(this.token, undefined, bytes),
-                    );
+            val number = decodeNumber(peekBuffer).toInt()
+            resultOrNull =
+                when (val field = numberToField[number]) {
+                    is RemovedNumber -> unknown.instance
+                    is UnknownField -> unknown.instance
+                    is ConstantField<Enum, *> -> field.instance
+                    is ValueField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a value field")
+                    null -> null
                 }
-            }
-            if (field.serializer) {
-                throw new Error(`refers to a value field: ${number}`);
-            }
-            return field.constant;
         } else {
-            ++stream.offset;
-            const number =
-            wire === 248 ? (decodeNumber(stream) as number) : wire - 250;
-            const field = this.fieldMapping[number];
-            if (!field) {
-                decodeUnused(stream);
-                // Check if the field was removed, in which case we want to return
-                // UNKNOWN, or is unrecognized.
-                if (!stream.keepUnrecognizedFields || this.removedNumbers.has(number)) {
-                    return this.defaultValue;
-                } else {
-                    const { offset } = stream;
-                    const bytes = ByteString.sliceOf(stream.buffer, startOffset, offset);
-                    return this.createFn(
-                        new UnrecognizedEnum(this.token, undefined, bytes),
-                    );
+            val number = if (wire == 248) decodeNumber(peekBuffer).toInt() else wire - 250
+            resultOrNull =
+                when (val field = numberToField[number]) {
+                    is RemovedNumber -> unknown.instance
+                    is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
+                    is ValueField<Enum, *> -> ValueField.wrapDecoded(field, peekBuffer, keepUnrecognizedFields = keepUnrecognizedFields)
+                    null -> null
                 }
+        }
+        val byteCount = peekBuffer.size - buffer.size
+        val result: Enum
+        if (resultOrNull == null) {
+            if (keepUnrecognizedFields) {
+                val bytes = buffer.readByteString(byteCount)
+                result = unknown.wrapUnrecognized(UnrecognizedEnum(bytes))
+            } else {
+                result = unknown.instance
+                buffer.skip(byteCount)
             }
-            const { serializer } = field;
-            if (!serializer) {
-                throw new Error(`refers to a constant field: ${number}`);
-            }
-            return field.wrap(serializer.decode(stream));
+        } else {
+            result = resultOrNull
+            buffer.skip(byteCount)
+        }
+        return result
     }
 }
