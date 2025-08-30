@@ -421,4 +421,341 @@ class StructSerializerTest {
             "Mixed defaults with one non-default should not be detected as default",
         ) // tags makes it non-default
     }
+
+    // Test data structures for unrecognized fields testing
+    data class PartialPersonFrozen(
+        val name: String = "",
+        val age: Int = 0,
+        val email: String? = null,
+        val unrecognizedFields: UnrecognizedFields<PartialPersonFrozen>? = null,
+    )
+
+    data class PartialPersonMutable(
+        var name: String = "",
+        var age: Int = 0,
+        var email: String? = null,
+        var unrecognizedFields: UnrecognizedFields<PartialPersonFrozen>? = null,
+    )
+
+    // Partial serializer that only knows about the first 3 fields (name, age, email)
+    private val partialPersonStructSerializer =
+        StructSerializer<PartialPersonFrozen, PartialPersonMutable>(
+            defaultInstance = PartialPersonFrozen(),
+            newMutable = { PartialPersonMutable() },
+            toFrozen = { mutable ->
+                PartialPersonFrozen(
+                    name = mutable.name,
+                    age = mutable.age,
+                    email = mutable.email,
+                    unrecognizedFields = mutable.unrecognizedFields,
+                )
+            },
+            getUnrecognizedFields = { frozen -> frozen.unrecognizedFields },
+            setUnrecognizedFields = { mutable, fields -> mutable.unrecognizedFields = fields },
+        ).apply {
+            // Only add the first 3 fields
+            addField(
+                StructSerializer.Field(
+                    name = "name",
+                    number = 0,
+                    serializer = Serializers.string,
+                    getter = { it.name },
+                    setter = { mutable, value -> mutable.name = value },
+                ),
+            )
+            addField(
+                StructSerializer.Field(
+                    name = "age",
+                    number = 1,
+                    serializer = Serializers.int32,
+                    getter = { it.age },
+                    setter = { mutable, value -> mutable.age = value },
+                ),
+            )
+            addField(
+                StructSerializer.Field(
+                    name = "email",
+                    number = 2,
+                    serializer = Serializers.optional(Serializers.string),
+                    getter = { it.email },
+                    setter = { mutable, value -> mutable.email = value },
+                ),
+            )
+            finalizeStruct()
+        }
+
+    private val partialPersonSerializer = Serializer(partialPersonStructSerializer)
+
+    @Test
+    fun `test unrecognized fields - JSON dense format roundtrip`() {
+        // Create a full person with all fields set
+        val fullPerson =
+            PersonFrozen(
+                name = "John Doe",
+                age = 30,
+                email = "john@example.com",
+                isActive = true,
+                tags = listOf("developer", "kotlin"),
+            )
+
+        // Step 1: Serialize with full serializer to dense JSON
+        val fullJson = personSerializer.toJsonCode(fullPerson, readableFlavor = false)
+
+        // Step 2: Deserialize with partial serializer (should capture unrecognized fields)
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
+
+        // Verify the known fields are correct
+        assertEquals("John Doe", partialPerson.name)
+        assertEquals(30, partialPerson.age)
+        assertEquals("john@example.com", partialPerson.email)
+
+        // Verify unrecognized fields are captured
+        assertTrue(partialPerson.unrecognizedFields != null, "Unrecognized fields should be captured")
+        assertTrue(partialPerson.unrecognizedFields?.jsonElements != null, "JSON elements should be captured")
+
+        // Step 3: Serialize with partial serializer (should preserve unrecognized fields)
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
+
+        // Step 4: Deserialize with full serializer (should restore original values)
+        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+
+        // Verify full roundtrip preserves all original values
+        assertEquals("John Doe", restoredPerson.name)
+        assertEquals(30, restoredPerson.age)
+        assertEquals("john@example.com", restoredPerson.email)
+        assertEquals(true, restoredPerson.isActive)
+        assertEquals(listOf("developer", "kotlin"), restoredPerson.tags)
+    }
+
+    @Test
+    fun `test unrecognized fields - JSON readable format roundtrip`() {
+        // Create a full person with all fields set
+        val fullPerson =
+            PersonFrozen(
+                name = "Jane Smith",
+                age = 25,
+                email = "jane@example.com",
+                isActive = false,
+                tags = listOf("manager", "team-lead"),
+            )
+
+        // Step 1: Serialize with full serializer to readable JSON
+        val fullJson = personSerializer.toJsonCode(fullPerson, readableFlavor = true)
+
+        // Step 2: Deserialize with partial serializer
+        // Note: Readable format doesn't preserve unrecognized fields, so we only get known fields
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
+
+        // Verify the known fields are correct
+        assertEquals("Jane Smith", partialPerson.name)
+        assertEquals(25, partialPerson.age)
+        assertEquals("jane@example.com", partialPerson.email)
+
+        // Readable format doesn't preserve unrecognized fields
+        assertTrue(partialPerson.unrecognizedFields == null, "Readable format should not capture unrecognized fields")
+
+        // Step 3: Serialize with partial serializer
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = true)
+
+        // Step 4: Deserialize with full serializer
+        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+
+        // Verify known fields are preserved, unknown fields are defaults
+        assertEquals("Jane Smith", restoredPerson.name)
+        assertEquals(25, restoredPerson.age)
+        assertEquals("jane@example.com", restoredPerson.email)
+        assertEquals(false, restoredPerson.isActive) // default value
+        assertEquals(emptyList<String>(), restoredPerson.tags) // default value
+    }
+
+    @Test
+    fun `test unrecognized fields - binary format roundtrip`() {
+        // Create a full person with all fields set
+        val fullPerson =
+            PersonFrozen(
+                name = "Bob Wilson",
+                age = 45,
+                email = "bob@example.com",
+                isActive = true,
+                tags = listOf("senior", "architect", "mentor"),
+            )
+
+        // Step 1: Serialize with full serializer to binary
+        val fullBytes = personSerializer.toBytes(fullPerson)
+
+        // Step 2: Deserialize with partial serializer (should capture unrecognized fields)
+        val partialPerson = partialPersonSerializer.fromBytes(fullBytes.toByteArray(), keepUnrecognizedFields = true)
+
+        // Verify the known fields are correct
+        assertEquals("Bob Wilson", partialPerson.name)
+        assertEquals(45, partialPerson.age)
+        assertEquals("bob@example.com", partialPerson.email)
+
+        // Verify unrecognized fields are captured
+        assertTrue(partialPerson.unrecognizedFields != null, "Unrecognized fields should be captured")
+        assertTrue(partialPerson.unrecognizedFields?.bytes != null, "Binary bytes should be captured")
+
+        // Step 3: Serialize with partial serializer (should preserve unrecognized fields)
+        val partialBytes = partialPersonSerializer.toBytes(partialPerson)
+
+        // Step 4: Deserialize with full serializer (should restore original values)
+        val restoredPerson = personSerializer.fromBytes(partialBytes.toByteArray(), keepUnrecognizedFields = false)
+
+        // Verify full roundtrip preserves all original values
+        assertEquals("Bob Wilson", restoredPerson.name)
+        assertEquals(45, restoredPerson.age)
+        assertEquals("bob@example.com", restoredPerson.email)
+        assertEquals(true, restoredPerson.isActive)
+        assertEquals(listOf("senior", "architect", "mentor"), restoredPerson.tags)
+    }
+
+    @Test
+    fun `test unrecognized fields - without keepUnrecognizedFields`() {
+        // Create a full person with all fields set
+        val fullPerson =
+            PersonFrozen(
+                name = "Alice Brown",
+                age = 35,
+                email = "alice@example.com",
+                isActive = true,
+                tags = listOf("product-manager"),
+            )
+
+        // Step 1: Serialize with full serializer
+        val fullJson = personSerializer.toJsonCode(fullPerson, readableFlavor = false)
+
+        // Step 2: Deserialize with partial serializer WITHOUT keepUnrecognizedFields
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = false)
+
+        // Verify the known fields are correct
+        assertEquals("Alice Brown", partialPerson.name)
+        assertEquals(35, partialPerson.age)
+        assertEquals("alice@example.com", partialPerson.email)
+
+        // Verify unrecognized fields are NOT captured
+        assertTrue(partialPerson.unrecognizedFields == null, "Unrecognized fields should not be captured")
+
+        // Step 3: Serialize with partial serializer
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
+
+        // Step 4: Deserialize with full serializer
+        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+
+        // Verify known fields are preserved, unknown fields are defaults
+        assertEquals("Alice Brown", restoredPerson.name)
+        assertEquals(35, restoredPerson.age)
+        assertEquals("alice@example.com", restoredPerson.email)
+        assertEquals(false, restoredPerson.isActive) // default value
+        assertEquals(emptyList<String>(), restoredPerson.tags) // default value
+    }
+
+    @Test
+    fun `test unrecognized fields - partial struct with defaults`() {
+        // Create a person with only some fields set (others are defaults)
+        val fullPerson =
+            PersonFrozen(
+                name = "Charlie Davis",
+                age = 0,
+                email = null,
+                isActive = true,
+                tags = emptyList(),
+            )
+
+        // Step 1: Serialize with full serializer to dense JSON
+        val fullJson = personSerializer.toJsonCode(fullPerson, readableFlavor = false)
+
+        // Step 2: Deserialize with partial serializer
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
+
+        // Verify the known fields are correct
+        assertEquals("Charlie Davis", partialPerson.name)
+        assertEquals(0, partialPerson.age)
+        assertEquals(null, partialPerson.email)
+
+        // Should still have unrecognized fields even if some are defaults
+        assertTrue(partialPerson.unrecognizedFields != null, "Should capture unrecognized fields even with defaults")
+
+        // Step 3: Roundtrip through partial serializer
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
+        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+
+        // Verify roundtrip preserves all values
+        assertEquals("Charlie Davis", restoredPerson.name)
+        assertEquals(0, restoredPerson.age)
+        assertEquals(null, restoredPerson.email)
+        assertEquals(true, restoredPerson.isActive) // should be preserved from unrecognized fields
+        assertEquals(emptyList<String>(), restoredPerson.tags) // default preserved
+    }
+
+    @Test
+    fun `test unrecognized fields - multiple roundtrips`() {
+        // Create a full person
+        val originalPerson =
+            PersonFrozen(
+                name = "Dave Evans",
+                age = 28,
+                email = "dave@example.com",
+                isActive = false,
+                tags = listOf("junior", "learning"),
+            )
+
+        var currentData = originalPerson
+
+        // Do multiple roundtrips: full -> partial -> full
+        for (i in 1..3) {
+            // Full -> Binary -> Partial (with unrecognized fields)
+            val fullBytes = personSerializer.toBytes(currentData)
+            val partialPerson = partialPersonSerializer.fromBytes(fullBytes.toByteArray(), keepUnrecognizedFields = true)
+
+            // Partial -> Binary -> Full (restore from unrecognized fields)
+            val partialBytes = partialPersonSerializer.toBytes(partialPerson)
+            currentData = personSerializer.fromBytes(partialBytes.toByteArray(), keepUnrecognizedFields = false)
+        }
+
+        // After multiple roundtrips, should still equal the original
+        assertEquals(originalPerson.name, currentData.name)
+        assertEquals(originalPerson.age, currentData.age)
+        assertEquals(originalPerson.email, currentData.email)
+        assertEquals(originalPerson.isActive, currentData.isActive)
+        assertEquals(originalPerson.tags, currentData.tags)
+    }
+
+    @Test
+    fun `test unrecognized fields - edge cases with empty and default values`() {
+        // Test with default instance
+        val defaultPerson = PersonFrozen() // all defaults
+
+        // Full -> Partial -> Full roundtrip with defaults
+        val fullJson = personSerializer.toJsonCode(defaultPerson, readableFlavor = false)
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
+        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+
+        // Should be identical to original default
+        assertEquals(defaultPerson, restoredPerson)
+
+        // Test with empty JSON array
+        val emptyArrayPerson = partialPersonSerializer.fromJsonCode("[]", keepUnrecognizedFields = true)
+        assertEquals(PartialPersonFrozen(), emptyArrayPerson)
+
+        // Test with large slot count but mostly defaults
+        val sparseFullPerson =
+            PersonFrozen(
+                name = "",
+                age = 0,
+                email = null,
+                isActive = false,
+                tags = listOf("only-this-matters"),
+            )
+
+        val sparseJson = personSerializer.toJsonCode(sparseFullPerson, readableFlavor = false)
+        val sparsePartial = partialPersonSerializer.fromJsonCode(sparseJson, keepUnrecognizedFields = true)
+        val restoredSparse =
+            personSerializer.fromJsonCode(
+                partialPersonSerializer.toJsonCode(sparsePartial, readableFlavor = false),
+                keepUnrecognizedFields = false,
+            )
+
+        assertEquals(sparseFullPerson, restoredSparse)
+    }
 }
