@@ -63,9 +63,9 @@ private object BoolSerializer : SerializerImpl<Boolean> {
 
     override fun toJson(
         input: Boolean,
-        readable: Boolean,
+        readableFlavor: Boolean,
     ): JsonElement {
-        return if (readable) {
+        return if (readableFlavor) {
             JsonPrimitive(input)
         } else {
             JsonPrimitive(if (input) 1 else 0)
@@ -134,7 +134,7 @@ private object Int32Serializer : SerializerImpl<Int> {
 
     override fun toJson(
         input: Int,
-        readable: Boolean,
+        readableFlavor: Boolean,
     ): JsonElement {
         return JsonPrimitive(input)
     }

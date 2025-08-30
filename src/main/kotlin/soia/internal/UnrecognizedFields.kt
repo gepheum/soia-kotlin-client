@@ -3,7 +3,7 @@ package soia.internal
 import kotlinx.serialization.json.JsonElement
 import okio.ByteString
 
-data class UnrecognizedFields<T> private constructor(
+class UnrecognizedFields<T> private constructor(
     internal val totalSlotCount: Int,
     internal val jsonElements: List<JsonElement>?,
     internal val bytes: ByteString?,
