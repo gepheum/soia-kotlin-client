@@ -285,11 +285,11 @@ class StructSerializer<Frozen, Mutable>(
         if (encodedSlotCount > recognizedSlotCount) {
             // We have some unrecognized fields.
             if (keepUnrecognizedFields) {
-                val peekBuffer = buffer.peek()
+                val peekBuffer = CountingSource(buffer.peek())
                 for (i in recognizedSlotCount until encodedSlotCount) {
-                    decodeUnused(peekBuffer)
+                    decodeUnused(peekBuffer.buffer)
                 }
-                val unrecognizedByteCount = peekBuffer.buffer.size
+                val unrecognizedByteCount = peekBuffer.bytesRead
                 val unrecognizedBytes = buffer.readByteString(unrecognizedByteCount)
                 val unrecognizedFields =
                     UnrecognizedFields<Frozen>(
