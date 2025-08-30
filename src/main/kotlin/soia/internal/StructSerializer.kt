@@ -274,7 +274,7 @@ class StructSerializer<Frozen, Mutable>(
                 wire - 246
             }
         // Do not read more slots than the number of recognized slots.
-        for (i in 0..encodedSlotCount.coerceAtMost(recognizedSlotCount)) {
+        for (i in 0 until encodedSlotCount.coerceAtMost(recognizedSlotCount)) {
             val field = slotToField[i]
             if (field != null) {
                 field.decodeValue(mutable, buffer, keepUnrecognizedFields = keepUnrecognizedFields)
