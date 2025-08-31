@@ -1,6 +1,6 @@
 package soia.internal
 
-import soia.KeyedItems
+import soia.KeyedList
 import java.util.Collections
 
 fun <M, E> toFrozenList(
@@ -21,33 +21,33 @@ fun <E> toFrozenList(elements: Iterable<E>): List<E> {
 }
 
 @Suppress("UNCHECKED_CAST")
-fun <M, E, K> toKeyedItems(
+fun <M, E, K> toKeyedList(
     elements: Iterable<M>,
     getKeySpec: String,
     getKey: (E) -> K,
     toFrozen: (M) -> E,
-): KeyedItems<E, K> {
-    return if (elements is KeyedItemsImpl<*, *> && elements.getKeySpec.isNotEmpty() && elements.getKey == getKey) {
-        elements as KeyedItems<E, K>
+): KeyedList<E, K> {
+    return if (elements is KeyedListImpl<*, *> && elements.getKeySpec.isNotEmpty() && elements.getKey == getKey) {
+        elements as KeyedList<E, K>
     } else {
-        val result = KeyedItemsImpl(elements.map(toFrozen), getKeySpec, getKey)
-        if (result.isEmpty()) emptyKeyedItems() else result
+        val result = KeyedListImpl(elements.map(toFrozen), getKeySpec, getKey)
+        if (result.isEmpty()) emptyKeyedList() else result
     }
 }
 
-fun <E, K> toKeyedItems(
+fun <E, K> toKeyedList(
     elements: Iterable<E>,
     getKeySpec: String,
     getKey: (E) -> K,
-): KeyedItems<E, K> {
-    return toKeyedItems(elements, getKeySpec, getKey) { it }
+): KeyedList<E, K> {
+    return toKeyedList(elements, getKeySpec, getKey) { it }
 }
 
 @Suppress("UNCHECKED_CAST")
 fun <E> emptyFrozenList(): List<E> = FrozenEmptyList as List<E>
 
 @Suppress("UNCHECKED_CAST")
-fun <E, K> emptyKeyedItems(): KeyedItems<E, K> = FrozenEmptyList as KeyedItems<E, K>
+fun <E, K> emptyKeyedList(): KeyedList<E, K> = FrozenEmptyList as KeyedList<E, K>
 
 private open class FrozenList<E>(
     val list: List<E>,
@@ -70,17 +70,17 @@ private open class FrozenList<E>(
     }
 }
 
-private open class KeyedItemsImpl<E, K>(
+private open class KeyedListImpl<E, K>(
     list: List<E>,
     val getKeySpec: String,
     val getKey: (E) -> K,
-) : FrozenList<E>(list), KeyedItems<E, K> {
+) : FrozenList<E>(list), KeyedList<E, K> {
     override val indexing: Map<K, E> by lazy {
         list.associateBy(getKey)
     }
 }
 
-private object FrozenEmptyList : FrozenList<Any>(emptyList()), KeyedItems<Any, Any> {
+private object FrozenEmptyList : FrozenList<Any>(emptyList()), KeyedList<Any, Any> {
     override val indexing: Map<Any, Any>
         get() = emptyMap()
 }
