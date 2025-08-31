@@ -1037,7 +1037,6 @@ class SerializersTest {
             @Suppress("UNCHECKED_CAST")
             val typedSerializer = serializer as Serializer<List<Any>>
 
-            @Suppress("UNCHECKED_CAST")
             val typedArray = list as List<Any>
 
             // JSON roundtrip

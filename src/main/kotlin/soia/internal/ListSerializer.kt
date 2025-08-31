@@ -7,19 +7,19 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import okio.Buffer
 import okio.BufferedSource
-import soia.IndexedList
+import soia.KeyedItems
 import soia.Serializer
 
 fun <E> listSerializer(item: Serializer<E>): Serializer<List<E>> {
     return Serializer(ListSerializer(item.impl))
 }
 
-fun <E, K> indexedListSerializer(
+fun <E, K> keyedItemsSerializer(
     item: Serializer<E>,
     getKeySpec: String,
     getKey: (E) -> K,
-): Serializer<IndexedList<E, K>> {
-    return Serializer(IndexedListSerializer(item.impl, getKeySpec, getKey))
+): Serializer<KeyedItems<E, K>> {
+    return Serializer(KeyedItemsSerializer(item.impl, getKeySpec, getKey))
 }
 
 private abstract class AbstractListSerializer<E, L : List<E>>(
@@ -106,14 +106,14 @@ private class ListSerializer<E>(item: SerializerImpl<E>) : AbstractListSerialize
     }
 }
 
-private class IndexedListSerializer<E, K>(
+private class KeyedItemsSerializer<E, K>(
     item: SerializerImpl<E>,
     val getKeySpec: String,
     val getKey: (E) -> K,
-) : AbstractListSerializer<E, IndexedList<E, K>>(item) {
-    override val emptyList: IndexedList<E, K> = emptyIndexedList()
+) : AbstractListSerializer<E, KeyedItems<E, K>>(item) {
+    override val emptyList: KeyedItems<E, K> = emptyKeyedItems()
 
-    override fun toList(list: List<E>): IndexedList<E, K> {
-        return toIndexedList(list, getKeySpec, getKey)
+    override fun toList(list: List<E>): KeyedItems<E, K> {
+        return toKeyedItems(list, getKeySpec, getKey)
     }
 }
