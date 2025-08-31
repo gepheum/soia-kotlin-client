@@ -51,49 +51,39 @@ class StructSerializerTest {
         ).apply {
             // Add fields in order by field number
             addField(
-                StructSerializer.Field(
-                    name = "name",
-                    number = 0,
-                    serializer = Serializers.string,
-                    getter = { it.name },
-                    setter = { mutable, value -> mutable.name = value },
-                ),
+                name = "name",
+                number = 0,
+                serializer = Serializers.string,
+                getter = { it.name },
+                setter = { mutable, value -> mutable.name = value },
             )
             addField(
-                StructSerializer.Field(
-                    name = "age",
-                    number = 1,
-                    serializer = Serializers.int32,
-                    getter = { it.age },
-                    setter = { mutable, value -> mutable.age = value },
-                ),
+                name = "age",
+                number = 1,
+                serializer = Serializers.int32,
+                getter = { it.age },
+                setter = { mutable, value -> mutable.age = value },
             )
             addField(
-                StructSerializer.Field(
-                    name = "email",
-                    number = 2,
-                    serializer = Serializers.optional(Serializers.string),
-                    getter = { it.email },
-                    setter = { mutable, value -> mutable.email = value },
-                ),
+                name = "email",
+                number = 2,
+                serializer = Serializers.optional(Serializers.string),
+                getter = { it.email },
+                setter = { mutable, value -> mutable.email = value },
             )
             addField(
-                StructSerializer.Field(
-                    name = "isActive",
-                    number = 3,
-                    serializer = Serializers.bool,
-                    getter = { it.isActive },
-                    setter = { mutable, value -> mutable.isActive = value },
-                ),
+                name = "isActive",
+                number = 3,
+                serializer = Serializers.bool,
+                getter = { it.isActive },
+                setter = { mutable, value -> mutable.isActive = value },
             )
             addField(
-                StructSerializer.Field(
-                    name = "tags",
-                    number = 4,
-                    serializer = Serializers.list(Serializers.string),
-                    getter = { it.tags },
-                    setter = { mutable, value -> mutable.tags = value },
-                ),
+                name = "tags",
+                number = 4,
+                serializer = Serializers.list(Serializers.string),
+                getter = { it.tags },
+                setter = { mutable, value -> mutable.tags = value },
             )
             finalizeStruct()
         }
@@ -301,7 +291,11 @@ class StructSerializerTest {
             )
 
         testSerializer.addField(
-            StructSerializer.Field("name", 0, Serializers.string, { it.name }, { m, v -> m.name = v }),
+            "name",
+            0,
+            Serializers.string,
+            { it.name },
+            { m, v -> m.name = v },
         )
 
         testSerializer.finalizeStruct()
@@ -310,7 +304,11 @@ class StructSerializerTest {
         var exceptionThrown = false
         try {
             testSerializer.addField(
-                StructSerializer.Field("age", 1, Serializers.int32, { it.age }, { m, v -> m.age = v }),
+                "age",
+                1,
+                Serializers.int32,
+                { it.age },
+                { m, v -> m.age = v },
             )
         } catch (e: IllegalStateException) {
             exceptionThrown = true
@@ -352,9 +350,9 @@ class StructSerializerTest {
                 getUnrecognizedFields = { null },
                 setUnrecognizedFields = { _, _ -> },
             ).apply {
-                addField(StructSerializer.Field("name", 0, Serializers.string, { it.name }, { m, v -> m.name = v }))
+                addField("name", 0, Serializers.string, { it.name }, { m, v -> m.name = v })
                 addRemovedNumber(1) // Field number 1 was removed
-                addField(StructSerializer.Field("value", 2, Serializers.int32, { it.value }, { m, v -> m.value = v }))
+                addField("value", 2, Serializers.int32, { it.value }, { m, v -> m.value = v })
                 finalizeStruct()
             }
 
@@ -455,31 +453,25 @@ class StructSerializerTest {
         ).apply {
             // Only add the first 3 fields
             addField(
-                StructSerializer.Field(
-                    name = "name",
-                    number = 0,
-                    serializer = Serializers.string,
-                    getter = { it.name },
-                    setter = { mutable, value -> mutable.name = value },
-                ),
+                name = "name",
+                number = 0,
+                serializer = Serializers.string,
+                getter = { it.name },
+                setter = { mutable, value -> mutable.name = value },
             )
             addField(
-                StructSerializer.Field(
-                    name = "age",
-                    number = 1,
-                    serializer = Serializers.int32,
-                    getter = { it.age },
-                    setter = { mutable, value -> mutable.age = value },
-                ),
+                name = "age",
+                number = 1,
+                serializer = Serializers.int32,
+                getter = { it.age },
+                setter = { mutable, value -> mutable.age = value },
             )
             addField(
-                StructSerializer.Field(
-                    name = "email",
-                    number = 2,
-                    serializer = Serializers.optional(Serializers.string),
-                    getter = { it.email },
-                    setter = { mutable, value -> mutable.email = value },
-                ),
+                name = "email",
+                number = 2,
+                serializer = Serializers.optional(Serializers.string),
+                getter = { it.email },
+                setter = { mutable, value -> mutable.email = value },
             )
             finalizeStruct()
         }
