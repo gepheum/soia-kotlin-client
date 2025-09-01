@@ -8,7 +8,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import okio.Buffer
 import okio.BufferedSource
-import okio.buffer
 import soia.Serializer
 
 class EnumSerializer<Enum : Any> private constructor(
@@ -20,15 +19,21 @@ class EnumSerializer<Enum : Any> private constructor(
         internal val getUnrecognized: (Instance) -> UnrecognizedEnum<Enum>?,
     )
 
-    @Suppress("UNCHECKED_CAST")
-    constructor(unknown: UnknownSpec<Enum, *>) : this(
-        UnknownField<Enum>(
-            unknown.javaClass as Class<out Enum>,
-            unknown.instance as Enum,
-            unknown.wrapUnrecognized as (UnrecognizedEnum<Enum>) -> Enum,
-            unknown.getUnrecognized as (Enum) -> UnrecognizedEnum<Enum>?,
-        ),
-    ) {}
+    companion object {
+        @Suppress("UNCHECKED_CAST")
+        fun <Enum : Any, Unknown : Enum> create(
+            unknownInstance: Unknown,
+            wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Unknown,
+            getUnrecognized: (Unknown) -> UnrecognizedEnum<Enum>?,
+        ) = EnumSerializer(
+            UnknownField(
+                unknownInstance.javaClass,
+                unknownInstance,
+                wrapUnrecognized,
+                getUnrecognized as (Enum) -> UnrecognizedEnum<Enum>?,
+            ),
+        )
+    }
 
     fun addConstantField(
         number: Int,
@@ -325,7 +330,12 @@ class EnumSerializer<Enum : Any> private constructor(
                 when (val field = numberToField[number]) {
                     is RemovedNumber -> unknown.instance
                     is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
-                    is ValueField<Enum, *> -> ValueField.wrapDecoded(field, peekBuffer.buffer, keepUnrecognizedFields = keepUnrecognizedFields)
+                    is ValueField<Enum, *> ->
+                        ValueField.wrapDecoded(
+                            field,
+                            peekBuffer.buffer,
+                            keepUnrecognizedFields = keepUnrecognizedFields,
+                        )
                     null -> null
                 }
         }

@@ -42,12 +42,10 @@ class EnumSerializerTest {
 
     // Simple enum with only constants
     private val colorEnumSerializer =
-        EnumSerializer(
-            EnumSerializer.UnknownSpec<Color, Color.Unknown>(
-                Color.UNKNOWN,
-                { unrecognized -> Color.Unknown(unrecognized) },
-                { enum -> enum.unrecognized },
-            ),
+        EnumSerializer.create<Color, Color.Unknown>(
+            Color.UNKNOWN,
+            { unrecognized -> Color.Unknown(unrecognized) },
+            { enum -> enum.unrecognized },
         ).apply {
             addConstantField(1, "red", Color.Red)
             addConstantField(2, "green", Color.Green)
@@ -58,12 +56,10 @@ class EnumSerializerTest {
 
     // Complex enum with both constants and value fields
     private val statusEnumSerializer =
-        EnumSerializer(
-            EnumSerializer.UnknownSpec<Status, Status.Unknown>(
-                Status.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
-                { unrecognized -> Status.Unknown(unrecognized) },
-                { enum -> enum.unrecognized },
-            ),
+        EnumSerializer.create<Status, Status.Unknown>(
+            Status.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
+            { unrecognized -> Status.Unknown(unrecognized) },
+            { enum -> enum.unrecognized },
         ).apply {
             addConstantField(1, "active", Status.Active)
             addConstantField(2, "inactive", Status.Inactive)
@@ -291,12 +287,10 @@ class EnumSerializerTest {
     fun `test enum serializer - error cases`() {
         // Test that finalizeEnum() can only be called once
         val testEnumSerializer =
-            EnumSerializer(
-                EnumSerializer.UnknownSpec<Color, Color.Unknown>(
-                    Color.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
-                    { unrecognized -> Color.Unknown(unrecognized) },
-                    { enum -> enum.unrecognized },
-                ),
+            EnumSerializer.create<Color, Color.Unknown>(
+                Color.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
+                { unrecognized -> Color.Unknown(unrecognized) },
+                { enum -> enum.unrecognized },
             )
 
         testEnumSerializer.addConstantField(1, "test", Color.Red)
