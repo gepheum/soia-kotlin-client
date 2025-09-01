@@ -13,12 +13,6 @@ import soia.Serializer
 class EnumSerializer<Enum : Any> private constructor(
     private val unknown: UnknownField<Enum>,
 ) : SerializerImpl<Enum> {
-    class UnknownSpec<Enum, Instance : Enum>(
-        internal val instance: Instance,
-        internal val wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Instance,
-        internal val getUnrecognized: (Instance) -> UnrecognizedEnum<Enum>?,
-    )
-
     companion object {
         @Suppress("UNCHECKED_CAST")
         fun <Enum : Any, Unknown : Enum> create(
