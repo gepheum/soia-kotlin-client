@@ -18,9 +18,9 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Import GPG private key
-        run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+      # - name: Import GPG private key
+      #   run: |
+      #     echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import --passphrase "${{ secrets.GPG_PASSPHRASE }}"
 
       - name: Publish to Sonatype
         run: ./gradlew publish
