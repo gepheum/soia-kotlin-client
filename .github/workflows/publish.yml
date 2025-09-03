@@ -14,16 +14,19 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17' # Use your desired Java version
+          java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
 
-      # - name: Import GPG private key
-      #   run: |
-      #     echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import --passphrase "${{ secrets.GPG_PASSPHRASE }}"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Publish to Sonatype
-        run: ./gradlew publish
+      - name: Import GPG private key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
+          gpg --list-secret-keys --keyid-format LONG
+
+      - name: Publish and Release to Maven Central
+        run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
         env:
           OSSRH_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           OSSRH_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
