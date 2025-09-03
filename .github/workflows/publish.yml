@@ -26,9 +26,4 @@ jobs:
           gpg --list-secret-keys --keyid-format LONG
 
       - name: Publish and Release to Maven Central
-        run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
-        env:
-          ossrhUsername: ${{ secrets.SONATYPE_USERNAME }}
-          ossrhPassword: ${{ secrets.SONATYPE_PASSWORD }}
-          signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
-          signingPassword: ${{ secrets.GPG_PASSPHRASE }}
+        run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository -PossrhUsername="${{ secrets.SONATYPE_USERNAME }}" -PossrhPassword="${{ secrets.SONATYPE_PASSWORD }}" -PsigningKey="${{ secrets.GPG_PRIVATE_KEY }}" -PsigningPassword="${{ secrets.GPG_PASSPHRASE }}"
