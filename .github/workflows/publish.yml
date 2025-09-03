@@ -25,27 +25,5 @@ jobs:
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
           gpg --list-secret-keys --keyid-format LONG
 
-      - name: Debug environment and test connectivity
-        run: |
-          echo "Testing basic connectivity..."
-          curl -v https://s01.oss.sonatype.org/service/local/ || echo "s01 connection failed"
-          curl -v https://oss.sonatype.org/service/local/ || echo "legacy connection failed"
-          
-          echo "Username length: ${#SONATYPE_USERNAME}"
-          echo "Password length: ${#SONATYPE_PASSWORD}"
-          echo "Username starts with: ${SONATYPE_USERNAME:0:3}..."
-          
-          echo "Testing authentication with verbose output..."
-          curl -v -u "$SONATYPE_USERNAME:$SONATYPE_PASSWORD" \
-            -H "Accept: application/json" \
-            https://s01.oss.sonatype.org/service/local/staging/profiles 2>&1 || echo "s01 auth failed"
-            
-          curl -v -u "$SONATYPE_USERNAME:$SONATYPE_PASSWORD" \
-            -H "Accept: application/json" \
-            https://oss.sonatype.org/service/local/staging/profiles 2>&1 || echo "legacy auth failed"
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-
       - name: Publish and Release to Maven Central
-        run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository -PossrhUsername="${{ secrets.SONATYPE_USERNAME }}" -PossrhPassword="${{ secrets.SONATYPE_PASSWORD }}" -PsigningKey="${{ secrets.GPG_PRIVATE_KEY }}" -PsigningPassword="${{ secrets.GPG_PASSPHRASE }}" --info --stacktrace
+        run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository -PossrhUsername="${{ secrets.SONATYPE_USERNAME }}" -PossrhPassword="${{ secrets.SONATYPE_PASSWORD }}" -PsigningKey="${{ secrets.GPG_PRIVATE_KEY }}" -PsigningPassword="${{ secrets.GPG_PASSPHRASE }}"
