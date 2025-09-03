@@ -3,6 +3,7 @@ plugins {
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
     `maven-publish`
     signing
+    id("io.github.gradle-nexus.publish-plugin") version "1.3.0"
 }
 
 group = "com.gepheum.soia"
@@ -27,6 +28,12 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// Add sources and javadoc JARs
+java {
+    withSourcesJar()
+    withJavadocJar()
 }
 
 publishing {
@@ -72,4 +79,16 @@ signing {
     )
     // Sign all publications
     sign(publishing.publications["mavenKotlin"])
+}
+
+// Configure Nexus publishing
+nexusPublishing {
+    repositories {
+        sonatype {
+            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+            username.set(project.findProperty("ossrhUsername") as String? ?: "")
+            password.set(project.findProperty("ossrhPassword") as String? ?: "")
+        }
+    }
 }
