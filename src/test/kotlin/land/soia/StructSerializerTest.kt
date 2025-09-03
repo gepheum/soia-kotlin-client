@@ -1,14 +1,14 @@
-package soia
+package land.soia
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import land.soia.internal.StructSerializer
+import land.soia.internal.UnrecognizedFields
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import soia.internal.StructSerializer
-import soia.internal.UnrecognizedFields
 
 class StructSerializerTest {
     // Test data structures

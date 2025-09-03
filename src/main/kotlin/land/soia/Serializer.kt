@@ -1,17 +1,18 @@
-package soia
+package land.soia
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import land.soia.internal.MustNameArguments
+import land.soia.internal.SerializerImpl
 import okio.Buffer
 import okio.ByteString
-import soia.internal.SerializerImpl
 
 class Serializer<T> internal constructor(
     internal val impl: SerializerImpl<T>,
 ) {
     fun toJson(
         input: T,
-        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        mustNameArguments: MustNameArguments = MustNameArguments,
         readableFlavor: Boolean = false,
     ): JsonElement {
         return this.impl.toJson(input, readableFlavor = readableFlavor)
@@ -19,7 +20,7 @@ class Serializer<T> internal constructor(
 
     fun toJsonCode(
         input: T,
-        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        mustNameArguments: MustNameArguments = MustNameArguments,
         readableFlavor: Boolean = false,
     ): String {
         val jsonElement = this.impl.toJson(input, readableFlavor = readableFlavor)
@@ -32,7 +33,7 @@ class Serializer<T> internal constructor(
 
     fun fromJson(
         json: JsonElement,
-        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
         return this.impl.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields)
@@ -40,7 +41,7 @@ class Serializer<T> internal constructor(
 
     fun fromJsonCode(
         jsonCode: String,
-        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
         val jsonElement = Json.Default.decodeFromString(JsonElement.serializer(), jsonCode)
@@ -56,7 +57,7 @@ class Serializer<T> internal constructor(
 
     fun fromBytes(
         bytes: ByteArray,
-        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
         val buffer = Buffer()
@@ -66,7 +67,7 @@ class Serializer<T> internal constructor(
 
     fun fromBytes(
         bytes: ByteString,
-        mustNameArguments: soia.internal.MustNameArguments = soia.internal.MustNameArguments,
+        mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
         val buffer = Buffer()

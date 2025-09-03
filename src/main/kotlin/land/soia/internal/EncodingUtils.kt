@@ -1,4 +1,4 @@
-package soia.internal
+package land.soia.internal
 
 import okio.Buffer
 import okio.BufferedSource

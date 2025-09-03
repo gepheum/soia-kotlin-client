@@ -1,6 +1,6 @@
-package soia.internal
+package land.soia.internal
 
-import soia.KeyedList
+import land.soia.KeyedList
 import java.util.Collections
 
 fun <M, E> toFrozenList(

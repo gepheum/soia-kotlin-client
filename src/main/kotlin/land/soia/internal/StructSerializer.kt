@@ -1,13 +1,13 @@
-package soia.internal
+package land.soia.internal
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
+import land.soia.Serializer
 import okio.Buffer
 import okio.BufferedSource
-import soia.Serializer
 
 class StructSerializer<Frozen, Mutable>(
     private val defaultInstance: Frozen,

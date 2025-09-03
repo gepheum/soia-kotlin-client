@@ -1,4 +1,4 @@
-package soia
+package land.soia
 
 class Method<Request, Response>(
     val name: String,

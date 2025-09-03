@@ -1,4 +1,4 @@
-package soia
+package land.soia
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -8,15 +8,15 @@ import kotlinx.serialization.json.double
 import kotlinx.serialization.json.float
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import land.soia.internal.SerializerImpl
+import land.soia.internal.decodeNumber
+import land.soia.internal.encodeInt32
+import land.soia.internal.encodeLengthPrefix
+import land.soia.internal.listSerializer
 import okio.Buffer
 import okio.BufferedSource
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
-import soia.internal.SerializerImpl
-import soia.internal.decodeNumber
-import soia.internal.encodeInt32
-import soia.internal.encodeLengthPrefix
-import soia.internal.listSerializer
 import java.time.Instant
 
 object Serializers {

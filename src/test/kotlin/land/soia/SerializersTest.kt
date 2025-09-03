@@ -1,4 +1,4 @@
-package soia
+package land.soia
 
 import kotlinx.serialization.json.JsonPrimitive
 import okio.ByteString

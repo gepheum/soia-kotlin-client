@@ -1,14 +1,14 @@
-package soia
+package land.soia
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import land.soia.internal.EnumSerializer
+import land.soia.internal.UnrecognizedEnum
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import soia.internal.EnumSerializer
-import soia.internal.UnrecognizedEnum
 
 class EnumSerializerTest {
     // Test enum types

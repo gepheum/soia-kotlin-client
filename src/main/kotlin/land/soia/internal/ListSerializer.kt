@@ -1,14 +1,14 @@
-package soia.internal
+package land.soia.internal
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
+import land.soia.KeyedList
+import land.soia.Serializer
 import okio.Buffer
 import okio.BufferedSource
-import soia.KeyedList
-import soia.Serializer
 
 fun <E> listSerializer(item: Serializer<E>): Serializer<List<E>> {
     return Serializer(ListSerializer(item.impl))
