@@ -1,5 +1,6 @@
 .gradle
 .idea
 .kotlin
-build
 DO_NOT_SUBMIT
+build
+secring.gpg

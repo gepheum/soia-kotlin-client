@@ -1,9 +1,9 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     kotlin("jvm") version "2.0.0"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
-    `maven-publish`
-    signing
-    id("io.github.gradle-nexus.publish-plugin") version "1.3.0"
+    id("com.vanniktech.maven.publish") version "0.28.0"
 }
 
 group = "com.gepheum.soia"
@@ -30,65 +30,47 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Add sources and javadoc JARs
-java {
-    withSourcesJar()
-    withJavadocJar()
-}
+// From https://proandroiddev.com/publishing-kotlin-multiplatform-libraries-with-sonatype-central-b40f7cc6866e
+mavenPublishing {
+    // Define coordinates for the published artifact
+    coordinates(
+        groupId = "land.soia",
+        artifactId = "soia-kotlin-client",
+        version = "1.0.0"
+    )
 
-publishing {
-    publications {
-        create<MavenPublication>("mavenKotlin") {
-            groupId = "land.soia"
-            artifactId = "soia-kotlin-client"
-            version = "1.0.0"
+    // Configure POM metadata for the published artifact
+    pom {
+        name.set("Soia Kotlin Client")
+        description.set("Soia Client for the Kotlin Language")
+        inceptionYear.set("2024")
+        url.set("https://github.com/gepheum/soia-kotlin-client")
 
-            from(components["java"])
-
-            pom {
-                name.set("Soia Kotlin Client")
-                description.set("Soia client for the Kotlin language")
-                url.set("https://github.com/gepheum/soia-kotlin-client")
-                licenses {
-                    license {
-                        name.set("MIT License")
-                        url.set("https://opensource.org/licenses/MIT")
-                    }
-                }
-                developers {
-                    developer {
-                        id.set("gepheum")
-                        name.set("Tyler Fibonacci")
-                        email.set("gepheum@gmail.com")
-                    }
-                }
-                scm {
-                    connection.set("scm:git:git://github.com/gepheum/soia-kotlin-client.git")
-                    developerConnection.set("scm:git:ssh://github.com/gepheum/soia-kotlin-client.git")
-                    url.set("https://github.com/gepheum/soia-kotlin-client")
-                }
+        licenses {
+            license {
+                name.set("MIT")
+                url.set("https://opensource.org/licenses/MIT")
             }
         }
-    }
-}
 
-signing {
-    useInMemoryPgpKeys(
-        project.findProperty("signingKey") as String? ?: "",
-        project.findProperty("signingPassword") as String? ?: "",
-    )
-    // Sign all publications
-    sign(publishing.publications["mavenKotlin"])
-}
+        // Specify developers information
+        developers {
+            developer {
+                id.set("gepheum")
+                name.set("Tyler Fibonacci")
+                email.set("gepheum@gmail.com")
+            }
+        }
 
-// Configure Nexus publishing
-nexusPublishing {
-    repositories {
-        sonatype {
-            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-            username.set(project.findProperty("ossrhUsername") as String? ?: "")
-            password.set(project.findProperty("ossrhPassword") as String? ?: "")
+        // Specify SCM information
+        scm {
+            url.set("https://github.com/gepheum/soia-kotlin-client")
         }
     }
+
+    // Configure publishing to Maven Central
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+
+    // Enable GPG signing for all publications
+    signAllPublications()
 }
