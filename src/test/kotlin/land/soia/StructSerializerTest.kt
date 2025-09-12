@@ -52,6 +52,7 @@ class StructSerializerTest {
             // Add fields in order by field number
             addField(
                 name = "name",
+                kotlinName = "name",
                 number = 0,
                 serializer = Serializers.string,
                 getter = { it.name },
@@ -59,6 +60,7 @@ class StructSerializerTest {
             )
             addField(
                 name = "age",
+                kotlinName = "age",
                 number = 1,
                 serializer = Serializers.int32,
                 getter = { it.age },
@@ -66,13 +68,15 @@ class StructSerializerTest {
             )
             addField(
                 name = "email",
+                kotlinName = "email",
                 number = 2,
                 serializer = Serializers.optional(Serializers.string),
                 getter = { it.email },
                 setter = { mutable, value -> mutable.email = value },
             )
             addField(
-                name = "isActive",
+                name = "is_active",
+                kotlinName = "isActive",
                 number = 3,
                 serializer = Serializers.bool,
                 getter = { it.isActive },
@@ -80,6 +84,7 @@ class StructSerializerTest {
             )
             addField(
                 name = "tags",
+                kotlinName = "tags",
                 number = 4,
                 serializer = Serializers.list(Serializers.string),
                 getter = { it.tags },
@@ -161,7 +166,7 @@ class StructSerializerTest {
         assertTrue(jsonObject.contains("name"), "Should contain name field")
         assertTrue(jsonObject.contains("age"), "Should contain age field")
         assertFalse(jsonObject.contains("email"), "Should not contain null/default email field") // null/default value should be omitted
-        assertTrue(jsonObject.contains("isActive"), "Should contain isActive field")
+        assertTrue(jsonObject.contains("is_active"), "Should contain isActive field")
         assertTrue(jsonObject.contains("tags"), "Should contain tags field")
 
         // Test roundtrip
@@ -292,6 +297,7 @@ class StructSerializerTest {
 
         testSerializer.addField(
             "name",
+            kotlinName = "name",
             0,
             Serializers.string,
             { it.name },
@@ -305,6 +311,7 @@ class StructSerializerTest {
         try {
             testSerializer.addField(
                 "age",
+                kotlinName = "age",
                 1,
                 Serializers.int32,
                 { it.age },
@@ -350,9 +357,9 @@ class StructSerializerTest {
                 getUnrecognizedFields = { null },
                 setUnrecognizedFields = { _, _ -> },
             ).apply {
-                addField("name", 0, Serializers.string, { it.name }, { m, v -> m.name = v })
+                addField("name", "name", 0, Serializers.string, { it.name }, { m, v -> m.name = v })
                 addRemovedNumber(1) // Field number 1 was removed
-                addField("value", 2, Serializers.int32, { it.value }, { m, v -> m.value = v })
+                addField("value", "value", 2, Serializers.int32, { it.value }, { m, v -> m.value = v })
                 finalizeStruct()
             }
 
@@ -454,6 +461,7 @@ class StructSerializerTest {
             // Only add the first 3 fields
             addField(
                 name = "name",
+                kotlinName = "name",
                 number = 0,
                 serializer = Serializers.string,
                 getter = { it.name },
@@ -461,6 +469,7 @@ class StructSerializerTest {
             )
             addField(
                 name = "age",
+                kotlinName = "age",
                 number = 1,
                 serializer = Serializers.int32,
                 getter = { it.age },
@@ -468,6 +477,7 @@ class StructSerializerTest {
             )
             addField(
                 name = "email",
+                kotlinName = "email",
                 number = 2,
                 serializer = Serializers.optional(Serializers.string),
                 getter = { it.email },

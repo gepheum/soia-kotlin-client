@@ -9,7 +9,7 @@ import land.soia.Serializer
 import okio.Buffer
 import okio.BufferedSource
 
-class StructSerializer<Frozen, Mutable>(
+class StructSerializer<Frozen : Any, Mutable : Any>(
     private val defaultInstance: Frozen,
     private val newMutable: () -> Mutable,
     private val toFrozen: (Mutable) -> Frozen,
@@ -18,23 +18,24 @@ class StructSerializer<Frozen, Mutable>(
 ) : SerializerImpl<Frozen> {
     private data class Field<Frozen, Mutable, T>(
         val name: String,
+        val kotlinName: String,
         val number: Int,
         val serializer: Serializer<T>,
         val getter: (Frozen) -> T,
         val setter: (Mutable, T) -> Unit,
     ) {
-        internal fun valueIsDefault(input: Frozen): Boolean {
+        fun valueIsDefault(input: Frozen): Boolean {
             return serializer.impl.isDefault(getter(input))
         }
 
-        internal fun valueToJson(
+        fun valueToJson(
             input: Frozen,
             readableFlavor: Boolean,
         ): JsonElement {
             return serializer.toJson(getter(input), readableFlavor = readableFlavor)
         }
 
-        internal fun valueFromJson(
+        fun valueFromJson(
             mutable: Mutable,
             json: JsonElement,
             keepUnrecognizedFields: Boolean,
@@ -43,14 +44,14 @@ class StructSerializer<Frozen, Mutable>(
             setter(mutable, value)
         }
 
-        internal fun encodeValue(
+        fun encodeValue(
             input: Frozen,
             buffer: Buffer,
         ) {
             serializer.impl.encode(getter(input), buffer)
         }
 
-        internal fun decodeValue(
+        fun decodeValue(
             mutable: Mutable,
             buffer: BufferedSource,
             keepUnrecognizedFields: Boolean,
@@ -58,17 +59,26 @@ class StructSerializer<Frozen, Mutable>(
             val value = serializer.impl.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
             setter(mutable, value)
         }
+
+        fun appendString(
+            input: Frozen,
+            out: StringBuilder,
+            eolIndent: String,
+        ) {
+            serializer.impl.appendString(getter(input), out, eolIndent)
+        }
     }
 
     fun <T> addField(
         name: String,
+        kotlinName: String,
         number: Int,
         serializer: Serializer<T>,
         getter: (Frozen) -> T,
         setter: (Mutable, T) -> Unit,
     ) {
         checkNotFinalized()
-        val field = Field(name, number, serializer, getter, setter)
+        val field = Field(name, kotlinName, number, serializer, getter, setter)
         fields.add(field)
         nameToField[field.name] = field
     }
@@ -270,7 +280,7 @@ class StructSerializer<Frozen, Mutable>(
     ): Frozen {
         val wire = buffer.readByte().toInt() and 0xFF
         if (wire == 0 || wire == 246) {
-            return this.defaultInstance
+            return defaultInstance
         }
         val mutable = newMutable()
         val encodedSlotCount =
@@ -311,6 +321,37 @@ class StructSerializer<Frozen, Mutable>(
             }
         }
         return toFrozen(mutable)
+    }
+
+    override fun appendString(
+        input: Frozen,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        val defaultFieldNumbers = mutableSetOf<Int>()
+        for (field in fields) {
+            if (field.valueIsDefault(input)) {
+                defaultFieldNumbers.add(field.number)
+            }
+        }
+        val className = getClassNameWithoutPackage(defaultInstance::class)
+        out
+            .append(className)
+            .append(if (defaultFieldNumbers.isNotEmpty()) ".partial" else "")
+            .append('(')
+        val newEolIndent = eolIndent + INDENT_UNIT
+        for (field in fields) {
+            if (defaultFieldNumbers.contains(field.number)) {
+                continue
+            }
+            out.append(newEolIndent).append(field.kotlinName).append(" = ")
+            field.appendString(input, out, eolIndent)
+            out.append(',')
+        }
+        if (defaultFieldNumbers.size < fields.size) {
+            out.append(eolIndent)
+        }
+        out.append(')')
     }
 
     /**

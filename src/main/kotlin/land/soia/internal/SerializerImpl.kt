@@ -26,4 +26,12 @@ interface SerializerImpl<T> {
         buffer: BufferedSource,
         keepUnrecognizedFields: Boolean = false,
     ): T
+
+    fun appendString(
+        input: T,
+        out: StringBuilder,
+        eolIndent: String,
+    )
 }
+
+internal const val INDENT_UNIT: String = "  "

@@ -93,6 +93,25 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
         }
     }
 
+    override fun appendString(
+        input: L,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        if (out.isEmpty()) {
+            out.append("listOf()")
+        } else {
+            val newEolIndent = eolIndent + INDENT_UNIT
+            out.append("listOf(")
+            for (item in input) {
+                out.append(newEolIndent)
+                this.item.appendString(item, out, newEolIndent)
+                out.append(',')
+            }
+            out.append(eolIndent).append(')')
+        }
+    }
+
     abstract val emptyList: L
 
     abstract fun toList(list: List<E>): L

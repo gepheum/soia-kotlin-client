@@ -8,6 +8,7 @@ import kotlinx.serialization.json.double
 import kotlinx.serialization.json.float
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import land.soia.internal.INDENT_UNIT
 import land.soia.internal.SerializerImpl
 import land.soia.internal.decodeNumber
 import land.soia.internal.encodeInt32
@@ -18,6 +19,7 @@ import okio.BufferedSource
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
 import java.time.Instant
+import java.time.format.DateTimeFormatter
 
 object Serializers {
     val bool: Serializer<Boolean> = Serializer(BoolSerializer)
@@ -62,6 +64,14 @@ private object BoolSerializer : SerializerImpl<Boolean> {
         keepUnrecognizedFields: Boolean,
     ): Boolean {
         return decodeNumber(buffer).toInt() != 0
+    }
+
+    override fun appendString(
+        input: Boolean,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        out.append(input)
     }
 
     override fun toJson(
@@ -120,6 +130,14 @@ private object Int32Serializer : SerializerImpl<Int> {
     ): Int {
         return json.jsonPrimitive.content.toInt()
     }
+
+    override fun appendString(
+        input: Int,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        out.append(input)
+    }
 }
 
 private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740992 // -(2 ^ 53)
@@ -165,6 +183,14 @@ private object Int64Serializer : SerializerImpl<Long> {
         keepUnrecognizedFields: Boolean,
     ): Long {
         return json.jsonPrimitive.content.toLong()
+    }
+
+    override fun appendString(
+        input: Long,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        out.append(input).append('L')
     }
 }
 
@@ -221,6 +247,14 @@ private object Uint64Serializer : SerializerImpl<ULong> {
     ): ULong {
         return json.jsonPrimitive.content.toULong()
     }
+
+    override fun appendString(
+        input: ULong,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        out.append(input).append("UL")
+    }
 }
 
 private object Float32Serializer : SerializerImpl<Float> {
@@ -269,6 +303,22 @@ private object Float32Serializer : SerializerImpl<Float> {
             primitive.float
         }
     }
+
+    override fun appendString(
+        input: Float,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        if (input.isFinite()) {
+            out.append(input).append('F')
+        } else if (input == Float.NEGATIVE_INFINITY) {
+            out.append("Float.NEGATIVE_INFINITY")
+        } else if (input == Float.POSITIVE_INFINITY) {
+            out.append("Float.POSITIVE_INFINITY")
+        } else {
+            out.append("Float.NaN")
+        }
+    }
 }
 
 private object Float64Serializer : SerializerImpl<Double> {
@@ -315,6 +365,22 @@ private object Float64Serializer : SerializerImpl<Double> {
             primitive.content.toDouble()
         } else {
             primitive.double
+        }
+    }
+
+    override fun appendString(
+        input: Double,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        if (input.isFinite()) {
+            out.append(input)
+        } else if (input == Double.NEGATIVE_INFINITY) {
+            out.append("Double.NEGATIVE_INFINITY")
+        } else if (input == Double.POSITIVE_INFINITY) {
+            out.append("Double.POSITIVE_INFINITY")
+        } else {
+            out.append("Double.NaN")
         }
     }
 }
@@ -374,6 +440,42 @@ private object StringSerializer : SerializerImpl<String> {
             throw IllegalArgumentException("Expected: string")
         }
     }
+
+    override fun appendString(
+        input: String,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        // Appends a quoted string which can be copied to a Kotlin source file.
+        out.append('"')
+        for (char in input) {
+            when (char) {
+                '\\' -> out.append("\\\\")
+                '"' -> out.append("\\\"")
+                '\n' -> out.append("\\n")
+                '\r' -> out.append("\\r")
+                '\t' -> out.append("\\t")
+                '\b' -> out.append("\\b")
+                '\u000C' -> out.append("\\f")
+                '$' -> out.append("\\$")
+                else -> {
+                    when {
+                        // Handle all control characters (0x00-0x1F and 0x7F-0x9F)
+                        char.code < 32 || char.code in 127..159 -> {
+                            out.append("\\u${char.code.toString(16).padStart(4, '0')}")
+                        }
+                        // Handle other non-printable Unicode characters
+                        !char.isDefined() || char.isISOControl() -> {
+                            out.append("\\u${char.code.toString(16).padStart(4, '0')}")
+                        }
+                        // Regular printable character
+                        else -> out.append(char)
+                    }
+                }
+            }
+        }
+        out.append('"')
+    }
 }
 
 private object BytesSerializer : SerializerImpl<ByteString> {
@@ -407,6 +509,14 @@ private object BytesSerializer : SerializerImpl<ByteString> {
             val length = decodeNumber(buffer)
             buffer.readByteString(length.toLong())
         }
+    }
+
+    override fun appendString(
+        input: ByteString,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        out.append('"').append(input.hex()).append("\".decodeHex()")
     }
 
     override fun toJson(
@@ -483,6 +593,24 @@ private object InstantSerializer : SerializerImpl<Instant> {
         return Instant.ofEpochMilli(unixMillis)
     }
 
+    override fun appendString(
+        input: Instant,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        out
+            .append("Instant.ofEpochMillis(")
+            .append(eolIndent)
+            .append(INDENT_UNIT)
+            .append("// ")
+            .append(DateTimeFormatter.ISO_INSTANT.format(input))
+            .append(eolIndent)
+            .append(INDENT_UNIT)
+            .append(input.toEpochMilli())
+            .append(eolIndent)
+            .append(')')
+    }
+
     fun clampUnixMillis(unixMillis: Long): Long {
         return unixMillis.coerceIn(-8640000000000000, 8640000000000000)
     }
@@ -513,6 +641,18 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
             null
         } else {
             this.other.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
+        }
+    }
+
+    override fun appendString(
+        input: T?,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        if (input == null) {
+            out.append("null")
+        } else {
+            this.other.appendString(input, out, eolIndent)
         }
     }
 

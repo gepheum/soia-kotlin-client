@@ -73,9 +73,15 @@ class EnumSerializer<Enum : Any> private constructor(
             input: Enum,
             buffer: Buffer,
         )
+
+        abstract fun appendString(
+            input: Enum,
+            out: StringBuilder,
+            eolIndent: String,
+        )
     }
 
-    private class UnknownField<Enum>(
+    private class UnknownField<Enum : Any>(
         override val instanceType: Class<out Enum>,
         val instance: Enum,
         val wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Enum,
@@ -107,9 +113,18 @@ class EnumSerializer<Enum : Any> private constructor(
                 buffer.writeByte(0)
             }
         }
+
+        override fun appendString(
+            input: Enum,
+            out: StringBuilder,
+            eolIndent: String,
+        ) {
+            val className = getClassNameWithoutPackage(input::class)
+            out.append(className).append(".UNKNOWN")
+        }
     }
 
-    private class ConstantField<Enum, Instance : Enum>(
+    private class ConstantField<Enum : Any, Instance : Enum>(
         override val number: Int,
         override val name: String,
         override val instanceType: Class<Instance>,
@@ -128,9 +143,18 @@ class EnumSerializer<Enum : Any> private constructor(
         ) {
             encodeInt32(number, buffer)
         }
+
+        override fun appendString(
+            input: Enum,
+            out: StringBuilder,
+            eolIndent: String,
+        ) {
+            val className = getClassNameWithoutPackage(input::class)
+            out.append(className)
+        }
     }
 
-    private class ValueField<Enum, T>(
+    private class ValueField<Enum : Any, T>(
         override val number: Int,
         override val name: String,
         override val instanceType: Class<out Enum>,
@@ -170,8 +194,20 @@ class EnumSerializer<Enum : Any> private constructor(
             valueSerializer.impl.encode(value, buffer)
         }
 
+        override fun appendString(
+            input: Enum,
+            out: StringBuilder,
+            eolIndent: String,
+        ) {
+            val newEolIndent = eolIndent + INDENT_UNIT
+            out.append(input::class).append('(').append(newEolIndent)
+            val value = getValue(input)
+            valueSerializer.impl.appendString(value, out, newEolIndent)
+            out.append(eolIndent).append(')')
+        }
+
         companion object {
-            internal fun <Enum, T> wrapFromJson(
+            internal fun <Enum : Any, T> wrapFromJson(
                 field: ValueField<Enum, T>,
                 json: JsonElement,
             ): Enum {
@@ -179,7 +215,7 @@ class EnumSerializer<Enum : Any> private constructor(
                 return field.wrap(value)
             }
 
-            internal fun <Enum, T> wrapDecoded(
+            internal fun <Enum : Any, T> wrapDecoded(
                 field: ValueField<Enum, T>,
                 buffer: BufferedSource,
                 keepUnrecognizedFields: Boolean,
@@ -348,5 +384,14 @@ class EnumSerializer<Enum : Any> private constructor(
             buffer.skip(byteCount)
         }
         return result
+    }
+
+    override fun appendString(
+        input: Enum,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        val field = instanceTypeToField[input.javaClass]!!
+        field.appendString(input, out, eolIndent)
     }
 }
