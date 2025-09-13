@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import land.soia.internal.StructSerializer
 import land.soia.internal.UnrecognizedFields
+import land.soia.internal.toStringImpl
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -759,5 +760,59 @@ class StructSerializerTest {
             )
 
         assertEquals(sparseFullPerson, restoredSparse)
+    }
+
+    @Test
+    fun `test toStringImpl() with partial`() {
+        val person =
+            PersonFrozen(
+                name = "",
+                age = 0,
+                email = null,
+                isActive = true,
+                tags = listOf("foo"),
+            )
+
+        assertEquals(
+            "StructSerializerTest.PersonFrozen.partial(\n" +
+                "  isActive = true,\n" +
+                "  tags = listOf(\n" +
+                "    \"foo\",\n" +
+                "  ),\n" +
+                ")",
+            toStringImpl(person, personSerializer.impl),
+        )
+    }
+
+    @Test
+    fun `test toStringImpl() with whole`() {
+        val person =
+            PersonFrozen(
+                name = "John",
+                age = 1,
+                email = "john@example.com",
+                isActive = true,
+                tags = listOf("foo"),
+            )
+
+        assertEquals(
+            "StructSerializerTest.PersonFrozen(\n" +
+                "  name = \"John\",\n" +
+                "  age = 1,\n" +
+                "  email = \"john@example.com\",\n" +
+                "  isActive = true,\n" +
+                "  tags = listOf(\n" +
+                "    \"foo\",\n" +
+                "  ),\n" +
+                ")",
+            toStringImpl(person, personSerializer.impl),
+        )
+    }
+
+    @Test
+    fun `test toStringImpl() with default instance`() {
+        val person = PersonFrozen()
+
+        assertEquals("StructSerializerTest.PersonFrozen.partial()", toStringImpl(person, personSerializer.impl))
     }
 }

@@ -30,7 +30,7 @@ object Serializers {
     val float64: Serializer<Double> = Serializer(Float64Serializer)
     val string: Serializer<String> = Serializer(StringSerializer)
     val bytes: Serializer<ByteString> = Serializer(BytesSerializer)
-    val instant: Serializer<Instant> = Serializer(InstantSerializer)
+    val timestamp: Serializer<Instant> = Serializer(TimestampSerializer)
 
     fun <T> optional(other: Serializer<T>): Serializer<T?> {
         val otherImpl = other.impl
@@ -448,11 +448,16 @@ private object StringSerializer : SerializerImpl<String> {
     ) {
         // Appends a quoted string which can be copied to a Kotlin source file.
         out.append('"')
-        for (char in input) {
-            when (char) {
+        for (i in 0 until input.length) {
+            when (val char = input[i]) {
                 '\\' -> out.append("\\\\")
                 '"' -> out.append("\\\"")
-                '\n' -> out.append("\\n")
+                '\n' -> {
+                    out.append("\\n")
+                    if (i < input.length - 1) {
+                        out.append("\" +${eolIndent}${INDENT_UNIT}\"")
+                    }
+                }
                 '\r' -> out.append("\\r")
                 '\t' -> out.append("\\t")
                 '\b' -> out.append("\\b")
@@ -541,7 +546,7 @@ private object BytesSerializer : SerializerImpl<ByteString> {
     }
 }
 
-private object InstantSerializer : SerializerImpl<Instant> {
+private object TimestampSerializer : SerializerImpl<Instant> {
     override fun isDefault(value: Instant): Boolean {
         return value == Instant.EPOCH
     }
@@ -607,6 +612,7 @@ private object InstantSerializer : SerializerImpl<Instant> {
             .append(eolIndent)
             .append(INDENT_UNIT)
             .append(input.toEpochMilli())
+            .append("L")
             .append(eolIndent)
             .append(')')
     }

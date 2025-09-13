@@ -35,3 +35,12 @@ interface SerializerImpl<T> {
 }
 
 internal const val INDENT_UNIT: String = "  "
+
+fun <T> toStringImpl(
+    input: T,
+    serializer: SerializerImpl<T>,
+): String {
+    val stringBuilder = StringBuilder()
+    serializer.appendString(input, stringBuilder, "\n")
+    return stringBuilder.toString()
+}

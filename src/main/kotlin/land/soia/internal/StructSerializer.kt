@@ -345,7 +345,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
                 continue
             }
             out.append(newEolIndent).append(field.kotlinName).append(" = ")
-            field.appendString(input, out, eolIndent)
+            field.appendString(input, out, newEolIndent)
             out.append(',')
         }
         if (defaultFieldNumbers.size < fields.size) {

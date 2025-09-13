@@ -200,7 +200,7 @@ class EnumSerializer<Enum : Any> private constructor(
             eolIndent: String,
         ) {
             val newEolIndent = eolIndent + INDENT_UNIT
-            out.append(input::class).append('(').append(newEolIndent)
+            out.append(getClassNameWithoutPackage(input::class)).append('(').append(newEolIndent)
             val value = getValue(input)
             valueSerializer.impl.appendString(value, out, newEolIndent)
             out.append(eolIndent).append(')')

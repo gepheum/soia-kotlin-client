@@ -1,7 +1,9 @@
 package land.soia
 
 import kotlinx.serialization.json.JsonPrimitive
+import land.soia.internal.toStringImpl
 import okio.ByteString
+import okio.ByteString.Companion.decodeHex
 import okio.ByteString.Companion.encodeUtf8
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -252,7 +254,7 @@ class SerializersTest {
     }
 
     @Test
-    fun `test instant serializer - dense flavor`() {
+    fun `test timestamp serializer - dense flavor`() {
         val instants =
             listOf(
                 Instant.EPOCH,
@@ -262,8 +264,8 @@ class SerializersTest {
             )
 
         for (instant in instants) {
-            val denseJson = Serializers.instant.toJsonCode(instant, readableFlavor = false)
-            val restored = Serializers.instant.fromJsonCode(denseJson)
+            val denseJson = Serializers.timestamp.toJsonCode(instant, readableFlavor = false)
+            val restored = Serializers.timestamp.fromJsonCode(denseJson)
             assertEquals(instant, restored, "Dense failed for instant: $instant")
 
             // Dense should produce a unix milliseconds number
@@ -271,16 +273,16 @@ class SerializersTest {
             assertNotNull(denseJsonValue, "Dense format should be a number, got: $denseJson")
 
             // Binary serialization
-            val bytes = Serializers.instant.toBytes(instant)
-            val restoredFromBytes = Serializers.instant.fromBytes(bytes.toByteArray())
+            val bytes = Serializers.timestamp.toBytes(instant)
+            val restoredFromBytes = Serializers.timestamp.fromBytes(bytes.toByteArray())
             assertEquals(instant, restoredFromBytes, "Binary failed for instant: $instant")
         }
     }
 
     @Test
-    fun `test instant serializer - readable flavor`() {
+    fun `test timestamp serializer - readable flavor`() {
         val instant = Instant.parse("2025-08-25T10:30:45Z")
-        val readableJson = Serializers.instant.toJsonCode(instant, readableFlavor = true)
+        val readableJson = Serializers.timestamp.toJsonCode(instant, readableFlavor = true)
 
         // Readable should produce an object with unix_millis and formatted
         assertEquals(
@@ -293,7 +295,7 @@ class SerializersTest {
             readableJson,
         )
 
-        val restoredFromReadable = Serializers.instant.fromJsonCode(readableJson)
+        val restoredFromReadable = Serializers.timestamp.fromJsonCode(readableJson)
         assertEquals(instant, restoredFromReadable, "Readable failed for instant: $instant")
     }
 
@@ -325,7 +327,7 @@ class SerializersTest {
                 Serializers.float64 to 2.71828,
                 Serializers.string to "test string",
                 Serializers.bytes to "test bytes".encodeUtf8(),
-                Serializers.instant to Instant.parse("2025-08-25T12:00:00Z"),
+                Serializers.timestamp to Instant.parse("2025-08-25T12:00:00Z"),
             )
 
         testData.forEach { (serializer, value) ->
@@ -504,12 +506,12 @@ class SerializersTest {
         val maxValid = Instant.ofEpochMilli(8640000000000000L)
 
         // Test that these values roundtrip correctly
-        val minBytes = Serializers.instant.toBytes(minValid)
-        val restoredMin = Serializers.instant.fromBytes(minBytes.toByteArray())
+        val minBytes = Serializers.timestamp.toBytes(minValid)
+        val restoredMin = Serializers.timestamp.fromBytes(minBytes.toByteArray())
         assertEquals(minValid, restoredMin)
 
-        val maxBytes = Serializers.instant.toBytes(maxValid)
-        val restoredMax = Serializers.instant.fromBytes(maxBytes.toByteArray())
+        val maxBytes = Serializers.timestamp.toBytes(maxValid)
+        val restoredMax = Serializers.timestamp.fromBytes(maxBytes.toByteArray())
         assertEquals(maxValid, restoredMax)
     }
 
@@ -523,10 +525,10 @@ class SerializersTest {
             )
 
         testCases.forEach { (instant, expectedHex) ->
-            val bytes = Serializers.instant.toBytes(instant)
+            val bytes = Serializers.timestamp.toBytes(instant)
             assertEquals(expectedHex, bytes.hex(), "Binary encoding failed for instant: $instant")
 
-            val restored = Serializers.instant.fromBytes(bytes.toByteArray())
+            val restored = Serializers.timestamp.fromBytes(bytes.toByteArray())
             assertEquals(instant, restored, "Binary decoding failed for instant: $instant")
         }
     }
@@ -544,7 +546,7 @@ class SerializersTest {
                 Serializers.float64 to 0.0,
                 Serializers.string to "",
                 Serializers.bytes to ByteString.EMPTY,
-                Serializers.instant to Instant.EPOCH,
+                Serializers.timestamp to Instant.EPOCH,
             )
 
         defaultTests.forEach { (serializer, defaultValue) ->
@@ -570,7 +572,7 @@ class SerializersTest {
         val stringOptional = Serializers.optional(Serializers.string)
         val boolOptional = Serializers.optional(Serializers.bool)
         val bytesOptional = Serializers.optional(Serializers.bytes)
-        val instantOptional = Serializers.optional(Serializers.instant)
+        val instantOptional = Serializers.optional(Serializers.timestamp)
 
         // Test non-null values
         val testValue = 42
@@ -630,7 +632,7 @@ class SerializersTest {
         val stringOptional = Serializers.optional(Serializers.string)
         val boolOptional = Serializers.optional(Serializers.bool)
         val bytesOptional = Serializers.optional(Serializers.bytes)
-        val instantOptional = Serializers.optional(Serializers.instant)
+        val instantOptional = Serializers.optional(Serializers.timestamp)
 
         // Test null values in JSON
         val nullJson = intOptional.toJsonCode(null)
@@ -662,7 +664,7 @@ class SerializersTest {
     @Test
     fun `test optional serializer json flavors`() {
         val intOptional = Serializers.optional(Serializers.int32)
-        val instantOptional = Serializers.optional(Serializers.instant)
+        val instantOptional = Serializers.optional(Serializers.timestamp)
         val boolOptional = Serializers.optional(Serializers.bool)
 
         // Test non-null values with different flavors
@@ -777,7 +779,7 @@ class SerializersTest {
         // While the API prevents double-optional, we can test complex scenarios
         val intOptional = Serializers.optional(Serializers.int32)
         val stringOptional = Serializers.optional(Serializers.string)
-        val instantOptional = Serializers.optional(Serializers.instant)
+        val instantOptional = Serializers.optional(Serializers.timestamp)
 
         // Test combinations of optional serializers with different types
         val testScenarios =
@@ -832,7 +834,7 @@ class SerializersTest {
                 "float64" to Serializers.optional(Serializers.float64),
                 "string" to Serializers.optional(Serializers.string),
                 "bytes" to Serializers.optional(Serializers.bytes),
-                "instant" to Serializers.optional(Serializers.instant),
+                "instant" to Serializers.optional(Serializers.timestamp),
             )
 
         val testValues =
@@ -1007,7 +1009,7 @@ class SerializersTest {
         val float64ArraySerializer = Serializers.list(Serializers.float64)
         val stringArraySerializer = Serializers.list(Serializers.string)
         val bytesArraySerializer = Serializers.list(Serializers.bytes)
-        val instantArraySerializer = Serializers.list(Serializers.instant)
+        val instantArraySerializer = Serializers.list(Serializers.timestamp)
 
         // Test data for each type
         val boolArray = listOf(true, false, true)
@@ -1255,5 +1257,76 @@ class SerializersTest {
         val largeBytes = intArraySerializer.toBytes(largeArray)
         assertTrue(largeBytes.size > 10000, "Binary should be substantial for 10000 elements")
         assertEquals(largeArray, intArraySerializer.fromBytes(largeBytes.toByteArray()))
+    }
+
+    @Test
+    fun `test toStringImpl - int32`() {
+        assertEquals("-2", toStringImpl(-2, Serializers.int32.impl))
+        assertEquals("300", toStringImpl(300, Serializers.int32.impl))
+    }
+
+    @Test
+    fun `test toStringImpl - int64`() {
+        assertEquals("-2L", toStringImpl(-2L, Serializers.int64.impl))
+    }
+
+    @Test
+    fun `test toStringImpl - uint64`() {
+        assertEquals("2UL", toStringImpl(2UL, Serializers.uint64.impl))
+    }
+
+    @Test
+    fun `test toStringImpl - float32`() {
+        assertEquals("3.14F", toStringImpl(3.14F, Serializers.float32.impl))
+        assertEquals("Float.NaN", toStringImpl(Float.NaN, Serializers.float32.impl))
+        assertEquals("Float.POSITIVE_INFINITY", toStringImpl(Float.POSITIVE_INFINITY, Serializers.float32.impl))
+        assertEquals("Float.NEGATIVE_INFINITY", toStringImpl(Float.NEGATIVE_INFINITY, Serializers.float32.impl))
+    }
+
+    @Test
+    fun `test toStringImpl - float64`() {
+        assertEquals("3.14", toStringImpl(3.14, Serializers.float64.impl))
+        assertEquals("Double.NaN", toStringImpl(Double.NaN, Serializers.float64.impl))
+        assertEquals("Double.POSITIVE_INFINITY", toStringImpl(Double.POSITIVE_INFINITY, Serializers.float64.impl))
+        assertEquals("Double.NEGATIVE_INFINITY", toStringImpl(Double.NEGATIVE_INFINITY, Serializers.float64.impl))
+    }
+
+    @Test
+    fun `test toStringImpl - bool`() {
+        assertEquals("false", toStringImpl(false, Serializers.bool.impl))
+        assertEquals("true", toStringImpl(true, Serializers.bool.impl))
+    }
+
+    @Test
+    fun `test toStringImpl - timestamp`() {
+        assertEquals(
+            "Instant.ofEpochMillis(\n" +
+                "  // 1970-01-02T10:17:36.789Z\n" +
+                "  123456789L\n" +
+                ")",
+            toStringImpl(Instant.ofEpochMilli(123456789L), Serializers.timestamp.impl),
+        )
+    }
+
+    @Test
+    fun `test toStringImpl - string`() {
+        assertEquals("\"\"", toStringImpl("", Serializers.string.impl))
+        assertEquals("\"foo\"", toStringImpl("foo", Serializers.string.impl))
+        assertEquals("\"foo\\n\"", toStringImpl("foo\n", Serializers.string.impl))
+        assertEquals("\"foo\\n\" +\n  \"bar\"", toStringImpl("foo\nbar", Serializers.string.impl))
+        assertEquals("\"\\t\\r\\\"\\\$\"", toStringImpl("\t\r\"\$", Serializers.string.impl))
+        assertEquals("\"\\u0001\"", toStringImpl("\u0001", Serializers.string.impl))
+    }
+
+    @Test
+    fun `test toStringImpl - bytes`() {
+        assertEquals("\"\".decodeHex()", toStringImpl(okio.ByteString.EMPTY, Serializers.bytes.impl))
+        assertEquals("\"abcd\".decodeHex()", toStringImpl("abcd".decodeHex(), Serializers.bytes.impl))
+    }
+
+    @Test
+    fun `test toStringImpl - optional`() {
+        assertEquals("null", toStringImpl(null, Serializers.optional(Serializers.bool).impl))
+        assertEquals("true", toStringImpl(true, Serializers.optional(Serializers.bool).impl))
     }
 }

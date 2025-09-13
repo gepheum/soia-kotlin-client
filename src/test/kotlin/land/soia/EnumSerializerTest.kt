@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import land.soia.internal.EnumSerializer
 import land.soia.internal.UnrecognizedEnum
+import land.soia.internal.toStringImpl
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -419,5 +420,19 @@ class EnumSerializerTest {
 
             assertEquals(testCase, restoredFromBinary, "Binary roundtrip should match for $testCase")
         }
+    }
+
+    @Test
+    fun `test enum serializer - toString()`() {
+        assertEquals(
+            "EnumSerializerTest.Status.Active",
+            toStringImpl(Status.Active, statusSerializer.impl),
+        )
+        assertEquals(
+            "EnumSerializerTest.Status.Pending(\n" +
+                "  \"foo\\n\" +\n    \"bar\"\n" +
+                ")",
+            toStringImpl(Status.Pending("foo\nbar"), statusSerializer.impl),
+        )
     }
 }
