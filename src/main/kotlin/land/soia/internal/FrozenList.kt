@@ -65,8 +65,16 @@ private open class FrozenList<E>(
         return FrozenList(list.subList(fromIndex, toIndex))
     }
 
+    override fun equals(other: Any?): Boolean {
+        return list == other
+    }
+
+    override fun hashCode(): Int {
+        return list.hashCode()
+    }
+
     override fun toString(): String {
-        return this.list.toString()
+        return list.toString()
     }
 }
 
