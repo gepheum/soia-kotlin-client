@@ -1,5 +1,6 @@
 package land.soia.internal
 
+import RecordId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -13,16 +14,16 @@ import okio.Buffer
 import okio.BufferedSource
 
 class StructSerializer<Frozen : Any, Mutable : Any>(
-    override val name: String,
-    override val qualifiedName: String,
-    override val modulePath: String,
-    override val parentType: RecordDescriptor?,
+    recordId: String,
+    val getParentTypeFn: () -> RecordDescriptor?,
     private val defaultInstance: Frozen,
     private val newMutableFn: () -> Mutable,
     private val toFrozenFn: (Mutable) -> Frozen,
     private val getUnrecognizedFields: (Frozen) -> UnrecognizedFields<Frozen>?,
     private val setUnrecognizedFields: (Mutable, UnrecognizedFields<Frozen>) -> Unit,
-) : SerializerImpl<Frozen>, StructDescriptor<Frozen, Mutable> {
+) : RecordSerializer<Frozen>(), StructDescriptor<Frozen, Mutable> {
+    override val parsedRecordId: RecordId = RecordId.parse(recordId)
+
     private data class Field<Frozen : Any, Mutable : Any, Value>(
         override val name: String,
         val kotlinName: String,
@@ -390,9 +391,28 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
     // REFLECTION: BEGIN
     // =========================================================================
 
+    override val parentType: RecordDescriptor?
+        get() = getParentTypeFn()
+
     override val fields: List<StructDescriptor.Field<Frozen, Mutable, *>> get() = java.util.Collections.unmodifiableList(mutableFields)
 
     override val removedNumbers: Set<Int> get() = java.util.Collections.unmodifiableSet(mutableRemovedNumbers)
+
+    override fun fieldDefinitions(): List<JsonObject> {
+        return mutableFields.map {
+            JsonObject(
+                mapOf(
+                    "name" to JsonPrimitive(it.name),
+                    "type" to it.serializer.impl.typeSignature,
+                    "number" to JsonPrimitive(it.number),
+                ),
+            )
+        }
+    }
+
+    override fun dependencies(): List<SerializerImpl<*>> {
+        return mutableFields.map { it.serializer.impl }
+    }
 
     override fun getField(name: String): StructDescriptor.Field<Frozen, Mutable, *>? {
         return nameToField[name]

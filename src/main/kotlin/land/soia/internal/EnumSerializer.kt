@@ -1,5 +1,6 @@
 package land.soia.internal
 
+import RecordId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -14,27 +15,23 @@ import okio.Buffer
 import okio.BufferedSource
 
 class EnumSerializer<Enum : Any> private constructor(
-    override val name: String,
-    override val qualifiedName: String,
-    override val modulePath: String,
-    override val parentType: RecordDescriptor?,
+    recordId: String,
+    val getParentTypeFn: () -> RecordDescriptor?,
     private val unknown: UnknownField<Enum>,
-) : SerializerImpl<Enum>, EnumDescriptor<Enum> {
+) : RecordSerializer<Enum>(), EnumDescriptor<Enum> {
+    override val parsedRecordId: RecordId = RecordId.parse(recordId)
+
     companion object {
         @Suppress("UNCHECKED_CAST")
         fun <Enum : Any, Unknown : Enum> create(
-            name: String,
-            qualifiedName: String,
-            modulePath: String,
-            parentType: RecordDescriptor?,
+            recordId: String,
+            getParentTypeFn: () -> RecordDescriptor?,
             unknownInstance: Unknown,
             wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Unknown,
             getUnrecognized: (Unknown) -> UnrecognizedEnum<Enum>?,
         ) = EnumSerializer(
-            name = name,
-            qualifiedName = qualifiedName,
-            modulePath = modulePath,
-            parentType = parentType,
+            recordId,
+            getParentTypeFn,
             unknown =
                 UnknownField(
                     unknownInstance.javaClass,
@@ -438,11 +435,49 @@ class EnumSerializer<Enum : Any> private constructor(
     // REFLECTION: BEGIN
     // =========================================================================
 
+    override val parentType: RecordDescriptor?
+        get() = getParentTypeFn()
+
     override val fields: List<EnumDescriptor.Field<Enum>>
         get() = java.util.Collections.unmodifiableList(mutableFields)
 
     override val removedNumbers: Set<Int>
         get() = java.util.Collections.unmodifiableSet(mutableRemovedNumbers)
+
+    override fun fieldDefinitions(): List<JsonObject> {
+        return (
+            nameToField
+                .values
+                .map {
+                    when (it) {
+                        is UnknownField -> null
+                        is ConstantField<Enum, *> -> {
+                            JsonObject(
+                                mapOf(
+                                    "name" to JsonPrimitive(it.name),
+                                    "number" to JsonPrimitive(it.number),
+                                ),
+                            )
+                        }
+                        is ValueField<Enum, *> -> {
+                            JsonObject(
+                                mapOf(
+                                    "name" to JsonPrimitive(it.name),
+                                    "number" to JsonPrimitive(it.number),
+                                    "type" to it.valueSerializer.impl.typeSignature,
+                                ),
+                            )
+                        }
+                    }
+                }
+                .filterIsInstance<JsonObject>()
+                .toList()
+        )
+    }
+
+    override fun dependencies(): List<SerializerImpl<*>> {
+        return fields.filterIsInstance<ValueField<*, *>>().map { it.valueSerializer.impl }
+    }
 
     override fun getField(name: String): EnumDescriptor.Field<Enum>? {
         val field = nameToField[name]

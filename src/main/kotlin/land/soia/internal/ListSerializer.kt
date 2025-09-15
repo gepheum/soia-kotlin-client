@@ -2,6 +2,7 @@ package land.soia.internal
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -26,7 +27,7 @@ fun <E, K> keyedListSerializer(
 
 private abstract class AbstractListSerializer<E, L : List<E>>(
     val item: SerializerImpl<E>,
-) : SerializerImpl<L>, ListDescriptor {
+) : SerializerImpl<L>(), ListDescriptor {
     override fun isDefault(value: L): Boolean {
         return value.isEmpty()
     }
@@ -118,11 +119,24 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
 
     abstract fun toList(list: List<E>): L
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
     override val itemType: TypeDescriptor
         get() = item.typeDescriptor
+
+    override val typeSignature: JsonElement
+        get() =
+            JsonObject(
+                mapOf(
+                    "kind" to JsonPrimitive("array"),
+                    "item" to item.typeSignature,
+                ),
+            )
+
+    override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {
+        item.addRecordDefinitionsTo(out)
+    }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
 }
 
 private class ListSerializer<E>(item: SerializerImpl<E>) : AbstractListSerializer<E, List<E>>(item), ListDescriptor {

@@ -1,6 +1,12 @@
 package land.soia
 
-sealed interface TypeDescriptor
+import kotlinx.serialization.json.JsonElement
+
+interface TypeDescriptorBase {
+    fun asJson(): JsonElement
+}
+
+sealed interface TypeDescriptor : TypeDescriptorBase
 
 enum class PrimitiveType {
     BOOL,
@@ -29,7 +35,7 @@ interface ListDescriptor : TypeDescriptor {
     val keyChain: String?
 }
 
-sealed interface RecordDescriptor : TypeDescriptor {
+interface RecordDescriptorBase : TypeDescriptorBase {
     /** Name of the struct as specified in the `.soia` file. */
     val name: String
 
@@ -56,6 +62,8 @@ sealed interface RecordDescriptor : TypeDescriptor {
     /** The field numbers marked as removed. */
     val removedNumbers: Set<Int>
 }
+
+sealed interface RecordDescriptor : RecordDescriptorBase, TypeDescriptor
 
 /** Describes a Soia struct. */
 interface StructDescriptor<Frozen : Any, Mutable : Any> : RecordDescriptor {

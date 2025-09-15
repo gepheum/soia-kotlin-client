@@ -34,10 +34,8 @@ class StructSerializerTest {
 
     private val personStructSerializer =
         StructSerializer<PersonFrozen, PersonMutable>(
-            "Person",
-            "Person",
-            "foo",
-            null,
+            "foo:Person",
+            { null },
             defaultInstance = defaultPerson,
             newMutableFn = { PersonMutable() },
             toFrozenFn = { mutable ->
@@ -310,10 +308,8 @@ class StructSerializerTest {
         // Test that finalizeStruct() can only be called once
         val testSerializer =
             StructSerializer<PersonFrozen, PersonMutable>(
-                "Person",
-                "Person",
-                "foo",
-                null,
+                "foo:Person",
+                { null },
                 defaultInstance = defaultPerson,
                 newMutableFn = { PersonMutable() },
                 toFrozenFn = { PersonFrozen() },
@@ -365,10 +361,8 @@ class StructSerializerTest {
 
         val serializerWithRemovedFields =
             StructSerializer<SimpleStruct, SimpleMutable>(
-                "Simple",
-                "Simple",
-                "foo",
-                null,
+                "foo:Simple",
+                { null },
                 defaultInstance = defaultSimple,
                 newMutableFn = { SimpleMutable() },
                 toFrozenFn = { mutable -> SimpleStruct(mutable.name, mutable.value) },
@@ -461,10 +455,8 @@ class StructSerializerTest {
     // Partial serializer that only knows about the first 3 fields (name, age, email)
     private val partialPersonStructSerializer =
         StructSerializer<PartialPersonFrozen, PartialPersonMutable>(
-            "Person",
-            "Person",
-            "foo",
-            null,
+            "foo:Person",
+            { null },
             defaultInstance = PartialPersonFrozen(),
             newMutableFn = { PartialPersonMutable() },
             toFrozenFn = { mutable ->

@@ -42,10 +42,8 @@ class EnumSerializerTest {
     // Simple enum with only constants
     private val colorEnumSerializer =
         EnumSerializer.create<Color, Color.Unknown>(
-            "Color",
-            "Color",
-            "foo.bar",
-            null,
+            "foo.bar:Color",
+            { null },
             Color.UNKNOWN,
             { unrecognized -> Color.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
@@ -60,10 +58,8 @@ class EnumSerializerTest {
     // Complex enum with both constants and value fields
     private val statusEnumSerializer =
         EnumSerializer.create<Status, Status.Unknown>(
-            "Status",
-            "Color.Status",
-            "foo.bar",
-            colorEnumSerializer,
+            "foo.bar:Color.Status",
+            { colorEnumSerializer },
             Status.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
             { unrecognized -> Status.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
@@ -295,10 +291,8 @@ class EnumSerializerTest {
         // Test that finalizeEnum() can only be called once
         val testEnumSerializer =
             EnumSerializer.create<Color, Color.Unknown>(
-                "Color",
-                "Color",
-                "foo.bar",
-                null,
+                "foo.bar:Color",
+                { null },
                 Color.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
                 { unrecognized -> Color.Unknown(unrecognized) },
                 { enum -> enum.unrecognized },

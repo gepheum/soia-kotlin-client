@@ -47,7 +47,22 @@ object Serializers {
     }
 }
 
-private object BoolSerializer : SerializerImpl<Boolean>, PrimitiveDescritor {
+private abstract class PrimitiveSerializer<T> : SerializerImpl<T>(), PrimitiveDescritor {
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val typeSignature: JsonElement get() =
+        JsonObject(
+            mapOf(
+                "kind" to JsonPrimitive("primitive"),
+                "value" to JsonPrimitive(primitiveType.name.uppercase()),
+            ),
+        )
+
+    override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {}
+}
+
+private object BoolSerializer : PrimitiveSerializer<Boolean>() {
     override fun isDefault(value: Boolean): Boolean {
         return !value
     }
@@ -104,7 +119,7 @@ private object BoolSerializer : SerializerImpl<Boolean>, PrimitiveDescritor {
         get() = PrimitiveType.BOOL
 }
 
-private object Int32Serializer : SerializerImpl<Int>, PrimitiveDescritor {
+private object Int32Serializer : PrimitiveSerializer<Int>(), PrimitiveDescritor {
     override fun isDefault(value: Int): Boolean {
         return value == 0
     }
@@ -155,7 +170,7 @@ private object Int32Serializer : SerializerImpl<Int>, PrimitiveDescritor {
 private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740992 // -(2 ^ 53)
 private const val MAX_SAFE_JAVASCRIPT_INT = 9007199254740992 // -(2 ^ 53)
 
-private object Int64Serializer : SerializerImpl<Long>, PrimitiveDescritor {
+private object Int64Serializer : PrimitiveSerializer<Long>(), PrimitiveDescritor {
     override fun isDefault(value: Long): Boolean {
         return value == 0L
     }
@@ -212,7 +227,7 @@ private object Int64Serializer : SerializerImpl<Long>, PrimitiveDescritor {
         get() = PrimitiveType.INT_64
 }
 
-private object Uint64Serializer : SerializerImpl<ULong>, PrimitiveDescritor {
+private object Uint64Serializer : PrimitiveSerializer<ULong>(), PrimitiveDescritor {
     override fun isDefault(value: ULong): Boolean {
         return value == 0UL
     }
@@ -281,7 +296,7 @@ private object Uint64Serializer : SerializerImpl<ULong>, PrimitiveDescritor {
         get() = PrimitiveType.UINT_64
 }
 
-private object Float32Serializer : SerializerImpl<Float>, PrimitiveDescritor {
+private object Float32Serializer : PrimitiveSerializer<Float>(), PrimitiveDescritor {
     override fun isDefault(value: Float): Boolean {
         return value == 0.0f
     }
@@ -351,7 +366,7 @@ private object Float32Serializer : SerializerImpl<Float>, PrimitiveDescritor {
         get() = PrimitiveType.FLOAT_32
 }
 
-private object Float64Serializer : SerializerImpl<Double>, PrimitiveDescritor {
+private object Float64Serializer : PrimitiveSerializer<Double>(), PrimitiveDescritor {
     override fun isDefault(value: Double): Boolean {
         return value == 0.0
     }
@@ -421,7 +436,7 @@ private object Float64Serializer : SerializerImpl<Double>, PrimitiveDescritor {
         get() = PrimitiveType.FLOAT_64
 }
 
-private object StringSerializer : SerializerImpl<String>, PrimitiveDescritor {
+private object StringSerializer : PrimitiveSerializer<String>(), PrimitiveDescritor {
     override fun isDefault(value: String): Boolean {
         return value.isEmpty()
     }
@@ -525,7 +540,7 @@ private object StringSerializer : SerializerImpl<String>, PrimitiveDescritor {
         get() = PrimitiveType.STRING
 }
 
-private object BytesSerializer : SerializerImpl<ByteString>, PrimitiveDescritor {
+private object BytesSerializer : PrimitiveSerializer<ByteString>(), PrimitiveDescritor {
     override fun isDefault(value: ByteString): Boolean {
         return value.size == 0
     }
@@ -594,7 +609,7 @@ private object BytesSerializer : SerializerImpl<ByteString>, PrimitiveDescritor 
         get() = PrimitiveType.BYTES
 }
 
-private object TimestampSerializer : SerializerImpl<Instant>, PrimitiveDescritor {
+private object TimestampSerializer : PrimitiveSerializer<Instant>(), PrimitiveDescritor {
     override fun isDefault(value: Instant): Boolean {
         return value == Instant.EPOCH
     }
@@ -676,7 +691,7 @@ private object TimestampSerializer : SerializerImpl<Instant>, PrimitiveDescritor
         get() = PrimitiveType.TIMESTAMP
 }
 
-private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerImpl<T?>, OptionalDescriptor {
+private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerImpl<T?>(), OptionalDescriptor {
     override fun isDefault(value: T?): Boolean {
         return value == null
     }
@@ -740,6 +755,19 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
 
     override val otherType: TypeDescriptor
         get() = other.typeDescriptor
+
+    override val typeSignature: JsonElement
+        get() =
+            JsonObject(
+                mapOf(
+                    "kind" to JsonPrimitive("optional"),
+                    "value" to other.typeSignature,
+                ),
+            )
+
+    override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {
+        other.addRecordDefinitionsTo(out)
+    }
 
     override val typeDescriptor: TypeDescriptor
         get() = this
