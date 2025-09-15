@@ -1,15 +1,14 @@
 package land.soia
 
+import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import land.soia.internal.StructSerializer
 import land.soia.internal.UnrecognizedFields
 import land.soia.internal.toStringImpl
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 class StructSerializerTest {
     // Test data structures
@@ -35,9 +34,13 @@ class StructSerializerTest {
 
     private val personStructSerializer =
         StructSerializer<PersonFrozen, PersonMutable>(
+            "Person",
+            "Person",
+            "foo",
+            null,
             defaultInstance = defaultPerson,
-            newMutable = { PersonMutable() },
-            toFrozen = { mutable ->
+            newMutableFn = { PersonMutable() },
+            toFrozenFn = { mutable ->
                 PersonFrozen(
                     name = mutable.name,
                     age = mutable.age,
@@ -99,22 +102,33 @@ class StructSerializerTest {
     @Test
     fun `test struct serializer - default instance`() {
         // Test isDefault
-        assertTrue(personStructSerializer.isDefault(defaultPerson), "Default instance should be detected as default")
+        assertThat(personStructSerializer.isDefault(defaultPerson))
+            .isTrue()
 
         val nonDefaultPerson = PersonFrozen(name = "John")
-        assertFalse(personStructSerializer.isDefault(nonDefaultPerson), "Non-default instance should not be detected as default")
+        assertThat(personStructSerializer.isDefault(nonDefaultPerson))
+            .isFalse()
 
         // Test JSON serialization - default should be empty array/object
         val defaultDenseJson = personStructSerializer.toJson(defaultPerson, readableFlavor = false)
-        assertTrue(defaultDenseJson is JsonArray && defaultDenseJson.isEmpty(), "Default dense JSON should be empty array")
+        assertThat(defaultDenseJson)
+            .isInstanceOf(JsonArray::class.java)
+        assertThat((defaultDenseJson as JsonArray))
+            .isEmpty()
 
         val defaultReadableJson = personStructSerializer.toJson(defaultPerson, readableFlavor = true)
-        assertTrue(defaultReadableJson is JsonObject && defaultReadableJson.isEmpty(), "Default readable JSON should be empty object")
+        assertThat(defaultReadableJson)
+            .isInstanceOf(JsonObject::class.java)
+        assertThat((defaultReadableJson as JsonObject))
+            .isEmpty()
 
         // Test JSON deserialization
-        assertEquals(defaultPerson, personStructSerializer.fromJson(JsonPrimitive(0), keepUnrecognizedFields = false))
-        assertEquals(defaultPerson, personStructSerializer.fromJson(JsonArray(emptyList()), keepUnrecognizedFields = false))
-        assertEquals(defaultPerson, personStructSerializer.fromJson(JsonObject(emptyMap()), keepUnrecognizedFields = false))
+        assertThat(personStructSerializer.fromJson(JsonPrimitive(0), keepUnrecognizedFields = false))
+            .isEqualTo(defaultPerson)
+        assertThat(personStructSerializer.fromJson(JsonArray(emptyList()), keepUnrecognizedFields = false))
+            .isEqualTo(defaultPerson)
+        assertThat(personStructSerializer.fromJson(JsonObject(emptyMap()), keepUnrecognizedFields = false))
+            .isEqualTo(defaultPerson)
     }
 
     @Test
@@ -130,22 +144,28 @@ class StructSerializerTest {
 
         // Test dense JSON - should be an array
         val denseJson = personStructSerializer.toJson(person, readableFlavor = false)
-        assertTrue(denseJson is JsonArray, "Dense JSON should be an array")
+        assertThat(denseJson)
+            .isInstanceOf(JsonArray::class.java)
 
         val jsonArray = denseJson as JsonArray
-        assertEquals("Alice", (jsonArray[0] as JsonPrimitive).content.removeSurrounding("\""))
-        assertEquals("30", (jsonArray[1] as JsonPrimitive).content)
-        assertEquals("alice@example.com", (jsonArray[2] as JsonPrimitive).content.removeSurrounding("\""))
-        assertEquals("1", (jsonArray[3] as JsonPrimitive).content) // bool dense format
-        assertTrue(jsonArray[4] is JsonArray, "Tags should be an array") // tags array
+        assertThat((jsonArray[0] as JsonPrimitive).content.removeSurrounding("\""))
+            .isEqualTo("Alice")
+        assertThat((jsonArray[1] as JsonPrimitive).content)
+            .isEqualTo("30")
+        assertThat((jsonArray[2] as JsonPrimitive).content.removeSurrounding("\""))
+            .isEqualTo("alice@example.com")
+        assertThat((jsonArray[3] as JsonPrimitive).content)
+            .isEqualTo("1") // bool dense format
+        assertThat(jsonArray[4])
+            .isInstanceOf(JsonArray::class.java) // tags array
 
         // Test roundtrip
         val restored = personStructSerializer.fromJson(denseJson, keepUnrecognizedFields = false)
-        assertEquals(person.name, restored.name)
-        assertEquals(person.age, restored.age)
-        assertEquals(person.email, restored.email)
-        assertEquals(person.isActive, restored.isActive)
-        assertEquals(person.tags, restored.tags)
+        assertThat(restored.name).isEqualTo(person.name)
+        assertThat(restored.age).isEqualTo(person.age)
+        assertThat(restored.email).isEqualTo(person.email)
+        assertThat(restored.isActive).isEqualTo(person.isActive)
+        assertThat(restored.tags).isEqualTo(person.tags)
     }
 
     @Test
@@ -161,22 +181,23 @@ class StructSerializerTest {
 
         // Test readable JSON - should be an object with only non-default values
         val readableJson = personStructSerializer.toJson(person, readableFlavor = true)
-        assertTrue(readableJson is JsonObject, "Readable JSON should be an object")
+        assertThat(readableJson)
+            .isInstanceOf(JsonObject::class.java)
 
         val jsonObject = readableJson as JsonObject
-        assertTrue(jsonObject.contains("name"), "Should contain name field")
-        assertTrue(jsonObject.contains("age"), "Should contain age field")
-        assertFalse(jsonObject.contains("email"), "Should not contain null/default email field") // null/default value should be omitted
-        assertTrue(jsonObject.contains("is_active"), "Should contain isActive field")
-        assertTrue(jsonObject.contains("tags"), "Should contain tags field")
+        assertThat(jsonObject).containsKey("name")
+        assertThat(jsonObject).containsKey("age")
+        assertThat(jsonObject).doesNotContainKey("email") // null/default value should be omitted
+        assertThat(jsonObject).containsKey("is_active")
+        assertThat(jsonObject).containsKey("tags")
 
         // Test roundtrip
         val restored = personStructSerializer.fromJson(readableJson, keepUnrecognizedFields = false)
-        assertEquals(person.name, restored.name)
-        assertEquals(person.age, restored.age)
-        assertEquals(person.email, restored.email)
-        assertEquals(person.isActive, restored.isActive)
-        assertEquals(person.tags, restored.tags)
+        assertThat(restored.name).isEqualTo(person.name)
+        assertThat(restored.age).isEqualTo(person.age)
+        assertThat(restored.email).isEqualTo(person.email)
+        assertThat(restored.isActive).isEqualTo(person.isActive)
+        assertThat(restored.tags).isEqualTo(person.tags)
     }
 
     @Test
@@ -189,34 +210,33 @@ class StructSerializerTest {
 
         // Empty struct should encode to wire 246 (0 fields)
         val emptyBytes = personSerializer.toBytes(emptyStruct)
-        assertTrue(emptyBytes.hex().startsWith("736f6961f6"), "Empty struct should start with soia prefix + 246") // soia prefix + 246
+        assertThat(emptyBytes.hex())
+            .startsWith("736f6961f6") // soia prefix + 246
 
         // One field should encode to wire 247 (1 field)
         val oneFieldBytes = personSerializer.toBytes(oneFieldStruct)
-        assertTrue(
-            oneFieldBytes.hex().startsWith("736f6961f7"),
-            "One field struct should start with soia prefix + 247",
-        ) // soia prefix + 247
+        assertThat(oneFieldBytes.hex())
+            .startsWith("736f6961f7") // soia prefix + 247
 
         // Two fields should encode to wire 248 (2 fields)
         val twoFieldBytes = personSerializer.toBytes(twoFieldStruct)
-        assertTrue(
-            twoFieldBytes.hex().startsWith("736f6961f8"),
-            "Two field struct should start with soia prefix + 248",
-        ) // soia prefix + 248
+        assertThat(twoFieldBytes.hex())
+            .startsWith("736f6961f8") // soia prefix + 248
 
         // Three fields should encode to wire 249 (3 fields)
         val threeFieldBytes = personSerializer.toBytes(threeFieldStruct)
-        assertTrue(
-            threeFieldBytes.hex().startsWith("736f6961f9"),
-            "Three field struct should start with soia prefix + 249",
-        ) // soia prefix + 249
+        assertThat(threeFieldBytes.hex())
+            .startsWith("736f6961f9") // soia prefix + 249
 
         // Test roundtrips
-        assertEquals(emptyStruct, personSerializer.fromBytes(emptyBytes.toByteArray()))
-        assertEquals(oneFieldStruct, personSerializer.fromBytes(oneFieldBytes.toByteArray()))
-        assertEquals(twoFieldStruct, personSerializer.fromBytes(twoFieldBytes.toByteArray()))
-        assertEquals(threeFieldStruct, personSerializer.fromBytes(threeFieldBytes.toByteArray()))
+        assertThat(personSerializer.fromBytes(emptyBytes.toByteArray()))
+            .isEqualTo(emptyStruct)
+        assertThat(personSerializer.fromBytes(oneFieldBytes.toByteArray()))
+            .isEqualTo(oneFieldStruct)
+        assertThat(personSerializer.fromBytes(twoFieldBytes.toByteArray()))
+            .isEqualTo(twoFieldStruct)
+        assertThat(personSerializer.fromBytes(threeFieldBytes.toByteArray()))
+            .isEqualTo(threeFieldStruct)
     }
 
     @Test
@@ -232,14 +252,15 @@ class StructSerializerTest {
             )
 
         val bytes = personSerializer.toBytes(fullStruct)
-        assertTrue(bytes.hex().startsWith("736f6961fa"), "Large struct should start with soia prefix + 250") // soia prefix + 250
+        assertThat(bytes.hex())
+            .startsWith("736f6961fa") // soia prefix + 250
 
         val restored = personSerializer.fromBytes(bytes.toByteArray())
-        assertEquals(fullStruct.name, restored.name)
-        assertEquals(fullStruct.age, restored.age)
-        assertEquals(fullStruct.email, restored.email)
-        assertEquals(fullStruct.isActive, restored.isActive)
-        assertEquals(fullStruct.tags, restored.tags)
+        assertThat(restored.name).isEqualTo(fullStruct.name)
+        assertThat(restored.age).isEqualTo(fullStruct.age)
+        assertThat(restored.email).isEqualTo(fullStruct.email)
+        assertThat(restored.isActive).isEqualTo(fullStruct.isActive)
+        assertThat(restored.tags).isEqualTo(fullStruct.tags)
     }
 
     @Test
@@ -261,27 +282,27 @@ class StructSerializerTest {
         val restoredFromReadable = personSerializer.fromJsonCode(readableJson)
 
         // Both should restore to the same object
-        assertEquals(testPerson.name, restoredFromDense.name)
-        assertEquals(testPerson.age, restoredFromDense.age)
-        assertEquals(testPerson.email, restoredFromDense.email)
-        assertEquals(testPerson.isActive, restoredFromDense.isActive)
-        assertEquals(testPerson.tags, restoredFromDense.tags)
+        assertThat(restoredFromDense.name).isEqualTo(testPerson.name)
+        assertThat(restoredFromDense.age).isEqualTo(testPerson.age)
+        assertThat(restoredFromDense.email).isEqualTo(testPerson.email)
+        assertThat(restoredFromDense.isActive).isEqualTo(testPerson.isActive)
+        assertThat(restoredFromDense.tags).isEqualTo(testPerson.tags)
 
-        assertEquals(testPerson.name, restoredFromReadable.name)
-        assertEquals(testPerson.age, restoredFromReadable.age)
-        assertEquals(testPerson.email, restoredFromReadable.email)
-        assertEquals(testPerson.isActive, restoredFromReadable.isActive)
-        assertEquals(testPerson.tags, restoredFromReadable.tags)
+        assertThat(restoredFromReadable.name).isEqualTo(testPerson.name)
+        assertThat(restoredFromReadable.age).isEqualTo(testPerson.age)
+        assertThat(restoredFromReadable.email).isEqualTo(testPerson.email)
+        assertThat(restoredFromReadable.isActive).isEqualTo(testPerson.isActive)
+        assertThat(restoredFromReadable.tags).isEqualTo(testPerson.tags)
 
         // Test binary roundtrip
         val bytes = personSerializer.toBytes(testPerson)
         val restoredFromBinary = personSerializer.fromBytes(bytes.toByteArray())
 
-        assertEquals(testPerson.name, restoredFromBinary.name)
-        assertEquals(testPerson.age, restoredFromBinary.age)
-        assertEquals(testPerson.email, restoredFromBinary.email)
-        assertEquals(testPerson.isActive, restoredFromBinary.isActive)
-        assertEquals(testPerson.tags, restoredFromBinary.tags)
+        assertThat(restoredFromBinary.name).isEqualTo(testPerson.name)
+        assertThat(restoredFromBinary.age).isEqualTo(testPerson.age)
+        assertThat(restoredFromBinary.email).isEqualTo(testPerson.email)
+        assertThat(restoredFromBinary.isActive).isEqualTo(testPerson.isActive)
+        assertThat(restoredFromBinary.tags).isEqualTo(testPerson.tags)
     }
 
     @Test
@@ -289,9 +310,13 @@ class StructSerializerTest {
         // Test that finalizeStruct() can only be called once
         val testSerializer =
             StructSerializer<PersonFrozen, PersonMutable>(
+                "Person",
+                "Person",
+                "foo",
+                null,
                 defaultInstance = defaultPerson,
-                newMutable = { PersonMutable() },
-                toFrozen = { PersonFrozen() },
+                newMutableFn = { PersonMutable() },
+                toFrozenFn = { PersonFrozen() },
                 getUnrecognizedFields = { null },
                 setUnrecognizedFields = { _, _ -> },
             )
@@ -308,8 +333,7 @@ class StructSerializerTest {
         testSerializer.finalizeStruct()
 
         // Adding fields after finalization should throw
-        var exceptionThrown = false
-        try {
+        assertThrows<IllegalStateException> {
             testSerializer.addField(
                 "age",
                 kotlinName = "age",
@@ -318,28 +342,17 @@ class StructSerializerTest {
                 { it.age },
                 { m, v -> m.age = v },
             )
-        } catch (e: IllegalStateException) {
-            exceptionThrown = true
         }
-        assertTrue(exceptionThrown, "Should throw exception when adding fields after finalization")
 
         // Adding removed numbers after finalization should throw
-        exceptionThrown = false
-        try {
+        assertThrows<IllegalStateException> {
             testSerializer.addRemovedNumber(5)
-        } catch (e: IllegalStateException) {
-            exceptionThrown = true
         }
-        assertTrue(exceptionThrown, "Should throw exception when adding removed numbers after finalization")
 
         // Double finalization should throw
-        exceptionThrown = false
-        try {
+        assertThrows<IllegalStateException> {
             testSerializer.finalizeStruct()
-        } catch (e: IllegalStateException) {
-            exceptionThrown = true
         }
-        assertTrue(exceptionThrown, "Should throw exception when finalizing twice")
     }
 
     @Test
@@ -352,9 +365,13 @@ class StructSerializerTest {
 
         val serializerWithRemovedFields =
             StructSerializer<SimpleStruct, SimpleMutable>(
+                "Simple",
+                "Simple",
+                "foo",
+                null,
                 defaultInstance = defaultSimple,
-                newMutable = { SimpleMutable() },
-                toFrozen = { mutable -> SimpleStruct(mutable.name, mutable.value) },
+                newMutableFn = { SimpleMutable() },
+                toFrozenFn = { mutable -> SimpleStruct(mutable.name, mutable.value) },
                 getUnrecognizedFields = { null },
                 setUnrecognizedFields = { _, _ -> },
             ).apply {
@@ -374,17 +391,17 @@ class StructSerializerTest {
         val restoredFromDense = serializer.fromJsonCode(denseJson)
         val restoredFromReadable = serializer.fromJsonCode(readableJson)
 
-        assertEquals(testStruct.name, restoredFromDense.name)
-        assertEquals(testStruct.value, restoredFromDense.value)
-        assertEquals(testStruct.name, restoredFromReadable.name)
-        assertEquals(testStruct.value, restoredFromReadable.value)
+        assertThat(restoredFromDense.name).isEqualTo(testStruct.name)
+        assertThat(restoredFromDense.value).isEqualTo(testStruct.value)
+        assertThat(restoredFromReadable.name).isEqualTo(testStruct.name)
+        assertThat(restoredFromReadable.value).isEqualTo(testStruct.value)
 
         // Test binary roundtrip - should handle removed field properly
         val bytes = serializer.toBytes(testStruct)
         val restoredFromBinary = serializer.fromBytes(bytes.toByteArray())
 
-        assertEquals(testStruct.name, restoredFromBinary.name)
-        assertEquals(testStruct.value, restoredFromBinary.value)
+        assertThat(restoredFromBinary.name).isEqualTo(testStruct.name)
+        assertThat(restoredFromBinary.value).isEqualTo(testStruct.value)
     }
 
     @Test
@@ -393,39 +410,37 @@ class StructSerializerTest {
 
         // All default values
         val allDefaults = PersonFrozen()
-        assertTrue(personStructSerializer.isDefault(allDefaults), "All defaults should be detected as default")
+        assertThat(personStructSerializer.isDefault(allDefaults))
+            .isTrue()
 
         // One non-default value
         val oneNonDefault = PersonFrozen(name = "test")
-        assertFalse(personStructSerializer.isDefault(oneNonDefault), "One non-default value should not be detected as default")
+        assertThat(personStructSerializer.isDefault(oneNonDefault))
+            .isFalse()
 
         // Edge case: empty string vs default string
         val emptyString = PersonFrozen(name = "")
-        assertTrue(personStructSerializer.isDefault(emptyString), "Empty string should be detected as default") // empty string is default
+        assertThat(personStructSerializer.isDefault(emptyString))
+            .isTrue() // empty string is default
 
         // Edge case: empty list vs default list
         val emptyList = PersonFrozen(tags = emptyList())
-        assertTrue(personStructSerializer.isDefault(emptyList), "Empty list should be detected as default") // empty list is default
+        assertThat(personStructSerializer.isDefault(emptyList))
+            .isTrue() // empty list is default
 
         // Edge case: null vs non-null optional
         val nullOptional = PersonFrozen(email = null)
-        assertTrue(
-            personStructSerializer.isDefault(nullOptional),
-            "Null optional should be detected as default",
-        ) // null is default for optional
+        assertThat(personStructSerializer.isDefault(nullOptional))
+            .isTrue() // null is default for optional
 
         val nonNullOptional = PersonFrozen(email = "")
-        assertFalse(
-            personStructSerializer.isDefault(nonNullOptional),
-            "Non-null optional should not be detected as default",
-        ) // even empty string is non-default for optional
+        assertThat(personStructSerializer.isDefault(nonNullOptional))
+            .isFalse() // even empty string is non-default for optional
 
         // Complex case: multiple defaults with one non-default
         val mixedDefaults = PersonFrozen(name = "", age = 0, email = null, isActive = false, tags = listOf("test"))
-        assertFalse(
-            personStructSerializer.isDefault(mixedDefaults),
-            "Mixed defaults with one non-default should not be detected as default",
-        ) // tags makes it non-default
+        assertThat(personStructSerializer.isDefault(mixedDefaults))
+            .isFalse() // tags makes it non-default
     }
 
     // Test data structures for unrecognized fields testing
@@ -446,9 +461,13 @@ class StructSerializerTest {
     // Partial serializer that only knows about the first 3 fields (name, age, email)
     private val partialPersonStructSerializer =
         StructSerializer<PartialPersonFrozen, PartialPersonMutable>(
+            "Person",
+            "Person",
+            "foo",
+            null,
             defaultInstance = PartialPersonFrozen(),
-            newMutable = { PartialPersonMutable() },
-            toFrozen = { mutable ->
+            newMutableFn = { PartialPersonMutable() },
+            toFrozenFn = { mutable ->
                 PartialPersonFrozen(
                     name = mutable.name,
                     age = mutable.age,
@@ -508,13 +527,13 @@ class StructSerializerTest {
         val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
 
         // Verify the known fields are correct
-        assertEquals("John Doe", partialPerson.name)
-        assertEquals(30, partialPerson.age)
-        assertEquals("john@example.com", partialPerson.email)
+        assertThat(partialPerson.name).isEqualTo("John Doe")
+        assertThat(partialPerson.age).isEqualTo(30)
+        assertThat(partialPerson.email).isEqualTo("john@example.com")
 
         // Verify unrecognized fields are captured
-        assertTrue(partialPerson.unrecognizedFields != null, "Unrecognized fields should be captured")
-        assertTrue(partialPerson.unrecognizedFields?.jsonElements != null, "JSON elements should be captured")
+        assertThat(partialPerson.unrecognizedFields).isNotNull()
+        assertThat(partialPerson.unrecognizedFields?.jsonElements).isNotNull()
 
         // Step 3: Serialize with partial serializer (should preserve unrecognized fields)
         val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
@@ -523,11 +542,11 @@ class StructSerializerTest {
         val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
 
         // Verify full roundtrip preserves all original values
-        assertEquals("John Doe", restoredPerson.name)
-        assertEquals(30, restoredPerson.age)
-        assertEquals("john@example.com", restoredPerson.email)
-        assertEquals(true, restoredPerson.isActive)
-        assertEquals(listOf("developer", "kotlin"), restoredPerson.tags)
+        assertThat(restoredPerson.name).isEqualTo("John Doe")
+        assertThat(restoredPerson.age).isEqualTo(30)
+        assertThat(restoredPerson.email).isEqualTo("john@example.com")
+        assertThat(restoredPerson.isActive).isEqualTo(true)
+        assertThat(restoredPerson.tags).isEqualTo(listOf("developer", "kotlin"))
     }
 
     @Test
@@ -550,12 +569,12 @@ class StructSerializerTest {
         val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
 
         // Verify the known fields are correct
-        assertEquals("Jane Smith", partialPerson.name)
-        assertEquals(25, partialPerson.age)
-        assertEquals("jane@example.com", partialPerson.email)
+        assertThat(partialPerson.name).isEqualTo("Jane Smith")
+        assertThat(partialPerson.age).isEqualTo(25)
+        assertThat(partialPerson.email).isEqualTo("jane@example.com")
 
         // Readable format doesn't preserve unrecognized fields
-        assertTrue(partialPerson.unrecognizedFields == null, "Readable format should not capture unrecognized fields")
+        assertThat(partialPerson.unrecognizedFields).isNull()
 
         // Step 3: Serialize with partial serializer
         val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = true)
@@ -564,11 +583,11 @@ class StructSerializerTest {
         val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
 
         // Verify known fields are preserved, unknown fields are defaults
-        assertEquals("Jane Smith", restoredPerson.name)
-        assertEquals(25, restoredPerson.age)
-        assertEquals("jane@example.com", restoredPerson.email)
-        assertEquals(false, restoredPerson.isActive) // default value
-        assertEquals(emptyList<String>(), restoredPerson.tags) // default value
+        assertThat(restoredPerson.name).isEqualTo("Jane Smith")
+        assertThat(restoredPerson.age).isEqualTo(25)
+        assertThat(restoredPerson.email).isEqualTo("jane@example.com")
+        assertThat(restoredPerson.isActive).isEqualTo(false) // default value
+        assertThat(restoredPerson.tags).isEqualTo(emptyList<String>()) // default value
     }
 
     @Test
@@ -590,13 +609,13 @@ class StructSerializerTest {
         val partialPerson = partialPersonSerializer.fromBytes(fullBytes.toByteArray(), keepUnrecognizedFields = true)
 
         // Verify the known fields are correct
-        assertEquals("Bob Wilson", partialPerson.name)
-        assertEquals(45, partialPerson.age)
-        assertEquals("bob@example.com", partialPerson.email)
+        assertThat(partialPerson.name).isEqualTo("Bob Wilson")
+        assertThat(partialPerson.age).isEqualTo(45)
+        assertThat(partialPerson.email).isEqualTo("bob@example.com")
 
         // Verify unrecognized fields are captured
-        assertTrue(partialPerson.unrecognizedFields != null, "Unrecognized fields should be captured")
-        assertTrue(partialPerson.unrecognizedFields?.bytes != null, "Binary bytes should be captured")
+        assertThat(partialPerson.unrecognizedFields).isNotNull()
+        assertThat(partialPerson.unrecognizedFields?.bytes).isNotNull()
 
         // Step 3: Serialize with partial serializer (should preserve unrecognized fields)
         val partialBytes = partialPersonSerializer.toBytes(partialPerson)
@@ -605,11 +624,11 @@ class StructSerializerTest {
         val restoredPerson = personSerializer.fromBytes(partialBytes.toByteArray(), keepUnrecognizedFields = false)
 
         // Verify full roundtrip preserves all original values
-        assertEquals("Bob Wilson", restoredPerson.name)
-        assertEquals(45, restoredPerson.age)
-        assertEquals("bob@example.com", restoredPerson.email)
-        assertEquals(true, restoredPerson.isActive)
-        assertEquals(listOf("senior", "architect", "mentor"), restoredPerson.tags)
+        assertThat(restoredPerson.name).isEqualTo("Bob Wilson")
+        assertThat(restoredPerson.age).isEqualTo(45)
+        assertThat(restoredPerson.email).isEqualTo("bob@example.com")
+        assertThat(restoredPerson.isActive).isEqualTo(true)
+        assertThat(restoredPerson.tags).isEqualTo(listOf("senior", "architect", "mentor"))
     }
 
     @Test
@@ -631,12 +650,12 @@ class StructSerializerTest {
         val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = false)
 
         // Verify the known fields are correct
-        assertEquals("Alice Brown", partialPerson.name)
-        assertEquals(35, partialPerson.age)
-        assertEquals("alice@example.com", partialPerson.email)
+        assertThat(partialPerson.name).isEqualTo("Alice Brown")
+        assertThat(partialPerson.age).isEqualTo(35)
+        assertThat(partialPerson.email).isEqualTo("alice@example.com")
 
         // Verify unrecognized fields are NOT captured
-        assertTrue(partialPerson.unrecognizedFields == null, "Unrecognized fields should not be captured")
+        assertThat(partialPerson.unrecognizedFields).isNull()
 
         // Step 3: Serialize with partial serializer
         val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
@@ -645,11 +664,11 @@ class StructSerializerTest {
         val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
 
         // Verify known fields are preserved, unknown fields are defaults
-        assertEquals("Alice Brown", restoredPerson.name)
-        assertEquals(35, restoredPerson.age)
-        assertEquals("alice@example.com", restoredPerson.email)
-        assertEquals(false, restoredPerson.isActive) // default value
-        assertEquals(emptyList<String>(), restoredPerson.tags) // default value
+        assertThat(restoredPerson.name).isEqualTo("Alice Brown")
+        assertThat(restoredPerson.age).isEqualTo(35)
+        assertThat(restoredPerson.email).isEqualTo("alice@example.com")
+        assertThat(restoredPerson.isActive).isEqualTo(false) // default value
+        assertThat(restoredPerson.tags).isEqualTo(emptyList<String>()) // default value
     }
 
     @Test
@@ -671,23 +690,23 @@ class StructSerializerTest {
         val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
 
         // Verify the known fields are correct
-        assertEquals("Charlie Davis", partialPerson.name)
-        assertEquals(0, partialPerson.age)
-        assertEquals(null, partialPerson.email)
+        assertThat(partialPerson.name).isEqualTo("Charlie Davis")
+        assertThat(partialPerson.age).isEqualTo(0)
+        assertThat(partialPerson.email).isEqualTo(null)
 
         // Should still have unrecognized fields even if some are defaults
-        assertTrue(partialPerson.unrecognizedFields != null, "Should capture unrecognized fields even with defaults")
+        assertThat(partialPerson.unrecognizedFields).isNotNull()
 
         // Step 3: Roundtrip through partial serializer
         val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
         val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
 
         // Verify roundtrip preserves all values
-        assertEquals("Charlie Davis", restoredPerson.name)
-        assertEquals(0, restoredPerson.age)
-        assertEquals(null, restoredPerson.email)
-        assertEquals(true, restoredPerson.isActive) // should be preserved from unrecognized fields
-        assertEquals(emptyList<String>(), restoredPerson.tags) // default preserved
+        assertThat(restoredPerson.name).isEqualTo("Charlie Davis")
+        assertThat(restoredPerson.age).isEqualTo(0)
+        assertThat(restoredPerson.email).isEqualTo(null)
+        assertThat(restoredPerson.isActive).isEqualTo(true) // should be preserved from unrecognized fields
+        assertThat(restoredPerson.tags).isEqualTo(emptyList<String>()) // default preserved
     }
 
     @Test
@@ -716,11 +735,11 @@ class StructSerializerTest {
         }
 
         // After multiple roundtrips, should still equal the original
-        assertEquals(originalPerson.name, currentData.name)
-        assertEquals(originalPerson.age, currentData.age)
-        assertEquals(originalPerson.email, currentData.email)
-        assertEquals(originalPerson.isActive, currentData.isActive)
-        assertEquals(originalPerson.tags, currentData.tags)
+        assertThat(currentData.name).isEqualTo(originalPerson.name)
+        assertThat(currentData.age).isEqualTo(originalPerson.age)
+        assertThat(currentData.email).isEqualTo(originalPerson.email)
+        assertThat(currentData.isActive).isEqualTo(originalPerson.isActive)
+        assertThat(currentData.tags).isEqualTo(originalPerson.tags)
     }
 
     @Test
@@ -735,11 +754,11 @@ class StructSerializerTest {
         val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
 
         // Should be identical to original default
-        assertEquals(defaultPerson, restoredPerson)
+        assertThat(restoredPerson).isEqualTo(defaultPerson)
 
         // Test with empty JSON array
         val emptyArrayPerson = partialPersonSerializer.fromJsonCode("[]", keepUnrecognizedFields = true)
-        assertEquals(PartialPersonFrozen(), emptyArrayPerson)
+        assertThat(emptyArrayPerson).isEqualTo(PartialPersonFrozen())
 
         // Test with large slot count but mostly defaults
         val sparseFullPerson =
@@ -759,7 +778,7 @@ class StructSerializerTest {
                 keepUnrecognizedFields = false,
             )
 
-        assertEquals(sparseFullPerson, restoredSparse)
+        assertThat(restoredSparse.toString()).isEqualTo(sparseFullPerson.toString())
     }
 
     @Test
@@ -773,15 +792,15 @@ class StructSerializerTest {
                 tags = listOf("foo"),
             )
 
-        assertEquals(
-            "StructSerializerTest.PersonFrozen.partial(\n" +
-                "  isActive = true,\n" +
-                "  tags = listOf(\n" +
-                "    \"foo\",\n" +
-                "  ),\n" +
-                ")",
-            toStringImpl(person, personSerializer.impl),
-        )
+        assertThat(toStringImpl(person, personSerializer.impl))
+            .isEqualTo(
+                "StructSerializerTest.PersonFrozen.partial(\n" +
+                    "  isActive = true,\n" +
+                    "  tags = listOf(\n" +
+                    "    \"foo\",\n" +
+                    "  ),\n" +
+                    ")",
+            )
     }
 
     @Test
@@ -795,24 +814,25 @@ class StructSerializerTest {
                 tags = listOf("foo"),
             )
 
-        assertEquals(
-            "StructSerializerTest.PersonFrozen(\n" +
-                "  name = \"John\",\n" +
-                "  age = 1,\n" +
-                "  email = \"john@example.com\",\n" +
-                "  isActive = true,\n" +
-                "  tags = listOf(\n" +
-                "    \"foo\",\n" +
-                "  ),\n" +
-                ")",
-            toStringImpl(person, personSerializer.impl),
-        )
+        assertThat(toStringImpl(person, personSerializer.impl))
+            .isEqualTo(
+                "StructSerializerTest.PersonFrozen(\n" +
+                    "  name = \"John\",\n" +
+                    "  age = 1,\n" +
+                    "  email = \"john@example.com\",\n" +
+                    "  isActive = true,\n" +
+                    "  tags = listOf(\n" +
+                    "    \"foo\",\n" +
+                    "  ),\n" +
+                    ")",
+            )
     }
 
     @Test
     fun `test toStringImpl() with default instance`() {
         val person = PersonFrozen()
 
-        assertEquals("StructSerializerTest.PersonFrozen.partial()", toStringImpl(person, personSerializer.impl))
+        assertThat(toStringImpl(person, personSerializer.impl))
+            .isEqualTo("StructSerializerTest.PersonFrozen.partial()")
     }
 }

@@ -1,6 +1,8 @@
 package land.soia
 
+import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import land.soia.internal.toStringImpl
 import okio.ByteString
 import okio.ByteString.Companion.decodeHex
@@ -15,54 +17,44 @@ class SerializersTest {
     @Test
     fun `test bool serializer - basic functionality`() {
         // Test true value - should be 1 in dense, true in readable
-        val trueJson = Serializers.bool.toJson(true, readableFlavor = false)
-        assertTrue(trueJson is JsonPrimitive)
-        assertEquals("1", (trueJson as JsonPrimitive).content)
-
-        val trueReadableJson = Serializers.bool.toJson(true, readableFlavor = true)
-        assertEquals("true", (trueReadableJson as JsonPrimitive).content)
-
-        // Test false value - should be 0 in dense, false in readable
-        val falseJson = Serializers.bool.toJson(false, readableFlavor = false)
-        assertEquals("0", (falseJson as JsonPrimitive).content)
-
-        val falseReadableJson = Serializers.bool.toJson(false, readableFlavor = true)
-        assertEquals("false", (falseReadableJson as JsonPrimitive).content)
+        assertThat((Serializers.bool.toJson(false, readableFlavor = true).jsonPrimitive.content)).isEqualTo("false")
+        assertThat((Serializers.bool.toJson(false, readableFlavor = false).jsonPrimitive.content)).isEqualTo("0")
+        assertThat((Serializers.bool.toJson(true, readableFlavor = true).jsonPrimitive.content)).isEqualTo("true")
+        assertThat((Serializers.bool.toJson(true, readableFlavor = false).jsonPrimitive.content)).isEqualTo("1")
 
         // Test round-trip
-        assertEquals(true, Serializers.bool.fromJson(trueJson))
+        assertEquals(true, Serializers.bool.fromJson(JsonPrimitive(true)))
         assertEquals(true, Serializers.bool.fromJsonCode("true"))
-        assertEquals(true, Serializers.bool.fromJson(trueReadableJson))
-        assertEquals(false, Serializers.bool.fromJson(falseJson))
+        assertEquals(true, Serializers.bool.fromJsonCode("1"))
+        assertEquals(true, Serializers.bool.fromJsonCode("100"))
+        assertEquals(true, Serializers.bool.fromJsonCode("3.14"))
+        assertEquals(true, Serializers.bool.fromJsonCode("\"1\""))
         assertEquals(false, Serializers.bool.fromJsonCode("false"))
-        assertEquals(false, Serializers.bool.fromJson(falseReadableJson))
-
-        assertEquals(true, Serializers.bool.fromJson(JsonPrimitive(100)))
-        assertEquals(true, Serializers.bool.fromJson(JsonPrimitive(3.14)))
-        assertEquals(false, Serializers.bool.fromJson(JsonPrimitive("0")))
-        assertEquals(true, Serializers.bool.fromJson(JsonPrimitive("-1")))
+        assertEquals(false, Serializers.bool.fromJsonCode("0"))
+        assertEquals(false, Serializers.bool.fromJsonCode("\"0\""))
     }
 
     @Test
     fun `test bool serializer - binary serialization`() {
         // From TypeScript tests: true -> "01", false -> "00"
         val trueBytes = Serializers.bool.toBytes(true)
-        assertEquals("736f696101", trueBytes.hex())
+        assertThat(trueBytes.hex()).isEqualTo("736f696101")
 
         val falseBytes = Serializers.bool.toBytes(false)
-        assertEquals("736f696100", falseBytes.hex())
+        assertThat(falseBytes.hex()).isEqualTo("736f696100")
 
         // Test round trip
         val restoredTrue = Serializers.bool.fromBytes(trueBytes.toByteArray())
-        assertEquals(true, restoredTrue)
+        assertThat(restoredTrue).isEqualTo(true)
 
         val restoredFalse = Serializers.bool.fromBytes(falseBytes)
-        assertEquals(false, restoredFalse)
+        assertThat(restoredFalse).isEqualTo(false)
 
-        assertEquals(true, Serializers.bool.fromBytes(Serializers.int32.toBytes(100)))
-        assertEquals(true, Serializers.bool.fromBytes(Serializers.float32.toBytes(3.14F)))
-        assertEquals(true, Serializers.bool.fromBytes(Serializers.uint64.toBytes(10000000000000000UL)))
-        assertEquals(true, Serializers.bool.fromBytes(Serializers.int64.toBytes(-1)))
+        assertThat(Serializers.bool.fromBytes(Serializers.int32.toBytes(100))).isEqualTo(true)
+        assertThat(Serializers.bool.fromBytes(Serializers.float32.toBytes(3.14F))).isEqualTo(true)
+        assertThat(Serializers.bool.fromBytes(Serializers.uint64.toBytes(10000000000000000UL))).isEqualTo(true)
+        assertThat(Serializers.bool.fromBytes(Serializers.uint64.toBytes(0UL))).isEqualTo(false)
+        assertThat(Serializers.bool.fromBytes(Serializers.int64.toBytes(-1))).isEqualTo(true)
     }
 
     @Test

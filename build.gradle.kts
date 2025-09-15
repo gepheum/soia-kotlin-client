@@ -24,6 +24,7 @@ dependencies {
     implementation("com.squareup.okio:okio:3.6.0")
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testImplementation("com.google.truth:truth:1.1.5")
 }
 
 tasks.test {

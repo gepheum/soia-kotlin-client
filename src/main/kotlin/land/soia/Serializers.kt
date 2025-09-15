@@ -47,7 +47,7 @@ object Serializers {
     }
 }
 
-private object BoolSerializer : SerializerImpl<Boolean> {
+private object BoolSerializer : SerializerImpl<Boolean>, PrimitiveDescritor {
     override fun isDefault(value: Boolean): Boolean {
         return !value
     }
@@ -96,9 +96,15 @@ private object BoolSerializer : SerializerImpl<Boolean> {
             else -> true
         }
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.BOOL
 }
 
-private object Int32Serializer : SerializerImpl<Int> {
+private object Int32Serializer : SerializerImpl<Int>, PrimitiveDescritor {
     override fun isDefault(value: Int): Boolean {
         return value == 0
     }
@@ -138,12 +144,18 @@ private object Int32Serializer : SerializerImpl<Int> {
     ) {
         out.append(input)
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.INT_32
 }
 
 private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740992 // -(2 ^ 53)
 private const val MAX_SAFE_JAVASCRIPT_INT = 9007199254740992 // -(2 ^ 53)
 
-private object Int64Serializer : SerializerImpl<Long> {
+private object Int64Serializer : SerializerImpl<Long>, PrimitiveDescritor {
     override fun isDefault(value: Long): Boolean {
         return value == 0L
     }
@@ -192,9 +204,15 @@ private object Int64Serializer : SerializerImpl<Long> {
     ) {
         out.append(input).append('L')
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.INT_64
 }
 
-private object Uint64Serializer : SerializerImpl<ULong> {
+private object Uint64Serializer : SerializerImpl<ULong>, PrimitiveDescritor {
     override fun isDefault(value: ULong): Boolean {
         return value == 0UL
     }
@@ -255,9 +273,15 @@ private object Uint64Serializer : SerializerImpl<ULong> {
     ) {
         out.append(input).append("UL")
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.UINT_64
 }
 
-private object Float32Serializer : SerializerImpl<Float> {
+private object Float32Serializer : SerializerImpl<Float>, PrimitiveDescritor {
     override fun isDefault(value: Float): Boolean {
         return value == 0.0f
     }
@@ -319,9 +343,15 @@ private object Float32Serializer : SerializerImpl<Float> {
             out.append("Float.NaN")
         }
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.FLOAT_32
 }
 
-private object Float64Serializer : SerializerImpl<Double> {
+private object Float64Serializer : SerializerImpl<Double>, PrimitiveDescritor {
     override fun isDefault(value: Double): Boolean {
         return value == 0.0
     }
@@ -383,9 +413,15 @@ private object Float64Serializer : SerializerImpl<Double> {
             out.append("Double.NaN")
         }
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.FLOAT_64
 }
 
-private object StringSerializer : SerializerImpl<String> {
+private object StringSerializer : SerializerImpl<String>, PrimitiveDescritor {
     override fun isDefault(value: String): Boolean {
         return value.isEmpty()
     }
@@ -481,9 +517,15 @@ private object StringSerializer : SerializerImpl<String> {
         }
         out.append('"')
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.STRING
 }
 
-private object BytesSerializer : SerializerImpl<ByteString> {
+private object BytesSerializer : SerializerImpl<ByteString>, PrimitiveDescritor {
     override fun isDefault(value: ByteString): Boolean {
         return value.size == 0
     }
@@ -544,9 +586,15 @@ private object BytesSerializer : SerializerImpl<ByteString> {
             throw IllegalArgumentException("Expected: base64 string")
         }
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.BYTES
 }
 
-private object TimestampSerializer : SerializerImpl<Instant> {
+private object TimestampSerializer : SerializerImpl<Instant>, PrimitiveDescritor {
     override fun isDefault(value: Instant): Boolean {
         return value == Instant.EPOCH
     }
@@ -620,9 +668,15 @@ private object TimestampSerializer : SerializerImpl<Instant> {
     fun clampUnixMillis(unixMillis: Long): Long {
         return unixMillis.coerceIn(-8640000000000000, 8640000000000000)
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val primitiveType: PrimitiveType
+        get() = PrimitiveType.TIMESTAMP
 }
 
-private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerImpl<T?> {
+private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerImpl<T?>, OptionalDescriptor {
     override fun isDefault(value: T?): Boolean {
         return value == null
     }
@@ -683,4 +737,10 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
             this.other.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields)
         }
     }
+
+    override val otherType: TypeDescriptor
+        get() = other.typeDescriptor
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
 }

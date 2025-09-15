@@ -6,7 +6,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import land.soia.KeyedList
+import land.soia.ListDescriptor
 import land.soia.Serializer
+import land.soia.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
 
@@ -16,15 +18,15 @@ fun <E> listSerializer(item: Serializer<E>): Serializer<List<E>> {
 
 fun <E, K> keyedListSerializer(
     item: Serializer<E>,
-    getKeySpec: String,
+    keyChain: String,
     getKey: (E) -> K,
 ): Serializer<KeyedList<E, K>> {
-    return Serializer(KeyedListSerializer(item.impl, getKeySpec, getKey))
+    return Serializer(KeyedListSerializer(item.impl, keyChain, getKey))
 }
 
 private abstract class AbstractListSerializer<E, L : List<E>>(
     val item: SerializerImpl<E>,
-) : SerializerImpl<L> {
+) : SerializerImpl<L>, ListDescriptor {
     override fun isDefault(value: L): Boolean {
         return value.isEmpty()
     }
@@ -89,7 +91,7 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
         return if (json is JsonPrimitive && 0 == json.intOrNull) {
             emptyList
         } else {
-            toList(json.jsonArray.map { item.fromJson(it, keepUnrecognizedFields == keepUnrecognizedFields) })
+            toList(json.jsonArray.map { item.fromJson(it, keepUnrecognizedFields = keepUnrecognizedFields) })
         }
     }
 
@@ -115,24 +117,36 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
     abstract val emptyList: L
 
     abstract fun toList(list: List<E>): L
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
+
+    override val itemType: TypeDescriptor
+        get() = item.typeDescriptor
 }
 
-private class ListSerializer<E>(item: SerializerImpl<E>) : AbstractListSerializer<E, List<E>>(item) {
+private class ListSerializer<E>(item: SerializerImpl<E>) : AbstractListSerializer<E, List<E>>(item), ListDescriptor {
     override val emptyList: List<E> = emptyList()
 
     override fun toList(list: List<E>): List<E> {
         return toFrozenList(list)
     }
+
+    override val keyChain: String?
+        get() = null
 }
 
 private class KeyedListSerializer<E, K>(
     item: SerializerImpl<E>,
-    val getKeySpec: String,
+    override val keyChain: String,
     val getKey: (E) -> K,
-) : AbstractListSerializer<E, KeyedList<E, K>>(item) {
+) : AbstractListSerializer<E, KeyedList<E, K>>(item), ListDescriptor {
     override val emptyList: KeyedList<E, K> = emptyKeyedList()
 
     override fun toList(list: List<E>): KeyedList<E, K> {
-        return toKeyedList(list, getKeySpec, getKey)
+        return toKeyedList(list, keyChain, getKey)
     }
+
+    override val typeDescriptor: TypeDescriptor
+        get() = this
 }

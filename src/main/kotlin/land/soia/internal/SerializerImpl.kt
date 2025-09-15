@@ -1,6 +1,7 @@
 package land.soia.internal
 
 import kotlinx.serialization.json.JsonElement
+import land.soia.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
 
@@ -32,6 +33,8 @@ interface SerializerImpl<T> {
         out: StringBuilder,
         eolIndent: String,
     )
+
+    val typeDescriptor: TypeDescriptor
 }
 
 internal const val INDENT_UNIT: String = "  "
