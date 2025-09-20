@@ -1,29 +1,32 @@
 package land.soia.internal
 
-import RecordId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import land.soia.RecordDescriptorBase
+import land.soia.reflection.FieldBase
+import land.soia.reflection.RecordDescriptor
+import land.soia.reflection.RecordDescriptorBase
 
-abstract class RecordSerializer<T> : SerializerImpl<T>(), RecordDescriptorBase {
+sealed class RecordSerializer<T, Field : FieldBase> : SerializerImpl<T>(), RecordDescriptorBase<Field> {
     internal abstract val parsedRecordId: RecordId
 
     internal abstract fun fieldDefinitions(): List<JsonObject>
 
     internal abstract fun dependencies(): List<SerializerImpl<*>>
 
-    override val name: String
+    abstract override val typeDescriptor: RecordDescriptor.Reflective<Field>
+
+    final override val name: String
         get() = parsedRecordId.name
 
-    override val qualifiedName: String
+    final override val qualifiedName: String
         get() = parsedRecordId.qualifiedName
 
-    override val modulePath: String
+    final override val modulePath: String
         get() = parsedRecordId.modulePath
 
-    override val typeSignature: JsonElement
+    final override val typeSignature: JsonElement
         get() =
             JsonObject(
                 mapOf(
@@ -32,7 +35,7 @@ abstract class RecordSerializer<T> : SerializerImpl<T>(), RecordDescriptorBase {
                 ),
             )
 
-    override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {
+    final override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {
         val recordId = parsedRecordId.recordId
         if (out.contains(recordId)) {
             return

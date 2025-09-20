@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import land.soia.internal.MustNameArguments
 import land.soia.internal.SerializerImpl
+import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.ByteString
 
@@ -93,6 +94,8 @@ class Serializer<T> internal constructor(
             this.fromJsonCode(buffer.readUtf8(), keepUnrecognizedFields = keepUnrecognizedFields)
         }
     }
+
+    val typeDescriptor: TypeDescriptor.Reflective get() = this.impl.typeDescriptor
 
     companion object {
         @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)

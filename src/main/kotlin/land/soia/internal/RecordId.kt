@@ -1,9 +1,11 @@
+package land.soia.internal
+
 internal data class RecordId(
     val recordId: String,
     val modulePath: String,
     val name: String,
     val qualifiedName: String,
-    val nameParts: List<String>,
+    private val nameParts: List<String>,
 ) {
     companion object {
         fun parse(recordId: String): RecordId {
@@ -18,6 +20,15 @@ internal data class RecordId(
                 qualifiedName = qualifiedName,
                 nameParts = nameParts,
             )
+        }
+    }
+
+    val parentId: String? by lazy {
+        if (nameParts.size <= 1) {
+            null
+        } else {
+            val parentNameParts = nameParts.subList(0, nameParts.size - 1)
+            parentNameParts.joinToString(".")
         }
     }
 }

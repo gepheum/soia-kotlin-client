@@ -7,6 +7,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import land.soia.internal.StructSerializer
 import land.soia.internal.UnrecognizedFields
 import land.soia.internal.toStringImpl
+import land.soia.reflection.asJson
+import land.soia.reflection.asJsonCode
+import land.soia.reflection.parseTypeDescriptor
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
@@ -35,7 +38,7 @@ class StructSerializerTest {
     private val personStructSerializer =
         StructSerializer<PersonFrozen, PersonMutable>(
             "foo:Person",
-            { null },
+            null,
             defaultInstance = defaultPerson,
             newMutableFn = { PersonMutable() },
             toFrozenFn = { mutable ->
@@ -309,7 +312,7 @@ class StructSerializerTest {
         val testSerializer =
             StructSerializer<PersonFrozen, PersonMutable>(
                 "foo:Person",
-                { null },
+                null,
                 defaultInstance = defaultPerson,
                 newMutableFn = { PersonMutable() },
                 toFrozenFn = { PersonFrozen() },
@@ -362,7 +365,7 @@ class StructSerializerTest {
         val serializerWithRemovedFields =
             StructSerializer<SimpleStruct, SimpleMutable>(
                 "foo:Simple",
-                { null },
+                null,
                 defaultInstance = defaultSimple,
                 newMutableFn = { SimpleMutable() },
                 toFrozenFn = { mutable -> SimpleStruct(mutable.name, mutable.value) },
@@ -456,7 +459,7 @@ class StructSerializerTest {
     private val partialPersonStructSerializer =
         StructSerializer<PartialPersonFrozen, PartialPersonMutable>(
             "foo:Person",
-            { null },
+            null,
             defaultInstance = PartialPersonFrozen(),
             newMutableFn = { PartialPersonMutable() },
             toFrozenFn = { mutable ->
@@ -826,5 +829,80 @@ class StructSerializerTest {
 
         assertThat(toStringImpl(person, personSerializer.impl))
             .isEqualTo("StructSerializerTest.PersonFrozen.partial()")
+    }
+
+    @Test
+    fun `test struct serializer - typeDescriptor`() {
+        val actualJson = personSerializer.typeDescriptor.asJsonCode()
+        val expectedJson =
+            "{\n" +
+                "  \"records\": [\n" +
+                "    {\n" +
+                "      \"kind\": \"struct\",\n" +
+                "      \"id\": \"foo:Person\",\n" +
+                "      \"fields\": [\n" +
+                "        {\n" +
+                "          \"name\": \"name\",\n" +
+                "          \"number\": 0,\n" +
+                "          \"type\": {\n" +
+                "            \"kind\": \"primitive\",\n" +
+                "            \"value\": \"string\"\n" +
+                "          }\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"name\": \"age\",\n" +
+                "          \"number\": 1,\n" +
+                "          \"type\": {\n" +
+                "            \"kind\": \"primitive\",\n" +
+                "            \"value\": \"int32\"\n" +
+                "          }\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"name\": \"email\",\n" +
+                "          \"number\": 2,\n" +
+                "          \"type\": {\n" +
+                "            \"kind\": \"optional\",\n" +
+                "            \"value\": {\n" +
+                "              \"kind\": \"primitive\",\n" +
+                "              \"value\": \"string\"\n" +
+                "            }\n" +
+                "          }\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"name\": \"is_active\",\n" +
+                "          \"number\": 3,\n" +
+                "          \"type\": {\n" +
+                "            \"kind\": \"primitive\",\n" +
+                "            \"value\": \"bool\"\n" +
+                "          }\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"name\": \"tags\",\n" +
+                "          \"number\": 4,\n" +
+                "          \"type\": {\n" +
+                "            \"kind\": \"array\",\n" +
+                "            \"value\": {\n" +
+                "              \"item\": {\n" +
+                "                \"kind\": \"primitive\",\n" +
+                "                \"value\": \"string\"\n" +
+                "              }\n" +
+                "            }\n" +
+                "          }\n" +
+                "        }\n" +
+                "      ],\n" +
+                "      \"removed_fields\": [\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  ],\n" +
+                "  \"type\": {\n" +
+                "    \"kind\": \"record\",\n" +
+                "    \"value\": \"foo:Person\"\n" +
+                "  }\n" +
+                "}"
+        assertThat(actualJson).isEqualTo(expectedJson)
+
+        assertThat(
+            parseTypeDescriptor(personSerializer.typeDescriptor.asJson()).asJsonCode(),
+        ).isEqualTo(expectedJson)
     }
 }

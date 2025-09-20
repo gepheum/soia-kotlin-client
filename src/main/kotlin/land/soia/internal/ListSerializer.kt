@@ -7,9 +7,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import land.soia.KeyedList
-import land.soia.ListDescriptor
 import land.soia.Serializer
-import land.soia.TypeDescriptor
+import land.soia.reflection.ListDescriptor
+import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
 
@@ -27,12 +27,12 @@ fun <E, K> keyedListSerializer(
 
 private abstract class AbstractListSerializer<E, L : List<E>>(
     val item: SerializerImpl<E>,
-) : SerializerImpl<L>(), ListDescriptor {
-    override fun isDefault(value: L): Boolean {
+) : SerializerImpl<L>(), ListDescriptor.Reflective {
+    final override fun isDefault(value: L): Boolean {
         return value.isEmpty()
     }
 
-    override fun encode(
+    final override fun encode(
         input: L,
         buffer: Buffer,
     ) {
@@ -53,7 +53,7 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
         }
     }
 
-    override fun decode(
+    final override fun decode(
         buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): L {
@@ -76,7 +76,7 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
         return toList(items)
     }
 
-    override fun toJson(
+    final override fun toJson(
         input: L,
         readableFlavor: Boolean,
     ): JsonElement {
@@ -85,7 +85,7 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
         )
     }
 
-    override fun fromJson(
+    final override fun fromJson(
         json: JsonElement,
         keepUnrecognizedFields: Boolean,
     ): L {
@@ -96,7 +96,7 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
         }
     }
 
-    override fun appendString(
+    final override fun appendString(
         input: L,
         out: StringBuilder,
         eolIndent: String,
@@ -119,10 +119,10 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
 
     abstract fun toList(list: List<E>): L
 
-    override val itemType: TypeDescriptor
+    final override val itemType: TypeDescriptor.Reflective
         get() = item.typeDescriptor
 
-    override val typeSignature: JsonElement
+    final override val typeSignature: JsonElement
         get() =
             JsonObject(
                 mapOf(
@@ -131,15 +131,14 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
                 ),
             )
 
-    override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {
+    final override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {
         item.addRecordDefinitionsTo(out)
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
+    final override val typeDescriptor get() = this
 }
 
-private class ListSerializer<E>(item: SerializerImpl<E>) : AbstractListSerializer<E, List<E>>(item), ListDescriptor {
+private class ListSerializer<E>(item: SerializerImpl<E>) : AbstractListSerializer<E, List<E>>(item) {
     override val emptyList: List<E> = emptyList()
 
     override fun toList(list: List<E>): List<E> {
@@ -154,13 +153,10 @@ private class KeyedListSerializer<E, K>(
     item: SerializerImpl<E>,
     override val keyChain: String,
     val getKey: (E) -> K,
-) : AbstractListSerializer<E, KeyedList<E, K>>(item), ListDescriptor {
+) : AbstractListSerializer<E, KeyedList<E, K>>(item) {
     override val emptyList: KeyedList<E, K> = emptyKeyedList()
 
     override fun toList(list: List<E>): KeyedList<E, K> {
         return toKeyedList(list, keyChain, getKey)
     }
-
-    override val typeDescriptor: TypeDescriptor
-        get() = this
 }

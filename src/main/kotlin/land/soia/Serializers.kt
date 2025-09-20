@@ -14,6 +14,10 @@ import land.soia.internal.decodeNumber
 import land.soia.internal.encodeInt32
 import land.soia.internal.encodeLengthPrefix
 import land.soia.internal.listSerializer
+import land.soia.reflection.OptionalDescriptor
+import land.soia.reflection.PrimitiveDescriptor
+import land.soia.reflection.PrimitiveType
+import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
 import okio.ByteString
@@ -47,22 +51,21 @@ object Serializers {
     }
 }
 
-private abstract class PrimitiveSerializer<T> : SerializerImpl<T>(), PrimitiveDescritor {
-    override val typeDescriptor: TypeDescriptor
-        get() = this
+private abstract class PrimitiveSerializer<T> : SerializerImpl<T>() {
+    abstract val typeName: String
 
     override val typeSignature: JsonElement get() =
         JsonObject(
             mapOf(
                 "kind" to JsonPrimitive("primitive"),
-                "value" to JsonPrimitive(primitiveType.name.uppercase()),
+                "value" to JsonPrimitive(typeName),
             ),
         )
 
     override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {}
 }
 
-private object BoolSerializer : PrimitiveSerializer<Boolean>() {
+private object BoolSerializer : PrimitiveSerializer<Boolean>(), PrimitiveDescriptor {
     override fun isDefault(value: Boolean): Boolean {
         return !value
     }
@@ -112,14 +115,12 @@ private object BoolSerializer : PrimitiveSerializer<Boolean>() {
         }
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.BOOL
+    override val typeName get() = "bool"
+    override val primitiveType get() = PrimitiveType.BOOL
+    override val typeDescriptor get() = this
 }
 
-private object Int32Serializer : PrimitiveSerializer<Int>(), PrimitiveDescritor {
+private object Int32Serializer : PrimitiveSerializer<Int>(), PrimitiveDescriptor {
     override fun isDefault(value: Int): Boolean {
         return value == 0
     }
@@ -160,17 +161,15 @@ private object Int32Serializer : PrimitiveSerializer<Int>(), PrimitiveDescritor 
         out.append(input)
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.INT_32
+    override val typeName get() = "int32"
+    override val primitiveType get() = PrimitiveType.INT_32
+    override val typeDescriptor get() = this
 }
 
 private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740992 // -(2 ^ 53)
 private const val MAX_SAFE_JAVASCRIPT_INT = 9007199254740992 // -(2 ^ 53)
 
-private object Int64Serializer : PrimitiveSerializer<Long>(), PrimitiveDescritor {
+private object Int64Serializer : PrimitiveSerializer<Long>(), PrimitiveDescriptor {
     override fun isDefault(value: Long): Boolean {
         return value == 0L
     }
@@ -220,14 +219,12 @@ private object Int64Serializer : PrimitiveSerializer<Long>(), PrimitiveDescritor
         out.append(input).append('L')
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.INT_64
+    override val typeName get() = "int64"
+    override val primitiveType get() = PrimitiveType.INT_64
+    override val typeDescriptor get() = this
 }
 
-private object Uint64Serializer : PrimitiveSerializer<ULong>(), PrimitiveDescritor {
+private object Uint64Serializer : PrimitiveSerializer<ULong>(), PrimitiveDescriptor {
     override fun isDefault(value: ULong): Boolean {
         return value == 0UL
     }
@@ -289,14 +286,12 @@ private object Uint64Serializer : PrimitiveSerializer<ULong>(), PrimitiveDescrit
         out.append(input).append("UL")
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.UINT_64
+    override val typeName get() = "uint64"
+    override val primitiveType get() = PrimitiveType.UINT_64
+    override val typeDescriptor get() = this
 }
 
-private object Float32Serializer : PrimitiveSerializer<Float>(), PrimitiveDescritor {
+private object Float32Serializer : PrimitiveSerializer<Float>(), PrimitiveDescriptor {
     override fun isDefault(value: Float): Boolean {
         return value == 0.0f
     }
@@ -359,14 +354,12 @@ private object Float32Serializer : PrimitiveSerializer<Float>(), PrimitiveDescri
         }
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.FLOAT_32
+    override val typeName get() = "float32"
+    override val primitiveType get() = PrimitiveType.FLOAT_32
+    override val typeDescriptor get() = this
 }
 
-private object Float64Serializer : PrimitiveSerializer<Double>(), PrimitiveDescritor {
+private object Float64Serializer : PrimitiveSerializer<Double>(), PrimitiveDescriptor {
     override fun isDefault(value: Double): Boolean {
         return value == 0.0
     }
@@ -429,14 +422,12 @@ private object Float64Serializer : PrimitiveSerializer<Double>(), PrimitiveDescr
         }
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.FLOAT_64
+    override val typeName get() = "float64"
+    override val primitiveType get() = PrimitiveType.FLOAT_64
+    override val typeDescriptor get() = this
 }
 
-private object StringSerializer : PrimitiveSerializer<String>(), PrimitiveDescritor {
+private object StringSerializer : PrimitiveSerializer<String>(), PrimitiveDescriptor {
     override fun isDefault(value: String): Boolean {
         return value.isEmpty()
     }
@@ -533,14 +524,12 @@ private object StringSerializer : PrimitiveSerializer<String>(), PrimitiveDescri
         out.append('"')
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.STRING
+    override val typeName get() = "string"
+    override val primitiveType get() = PrimitiveType.STRING
+    override val typeDescriptor get() = this
 }
 
-private object BytesSerializer : PrimitiveSerializer<ByteString>(), PrimitiveDescritor {
+private object BytesSerializer : PrimitiveSerializer<ByteString>(), PrimitiveDescriptor {
     override fun isDefault(value: ByteString): Boolean {
         return value.size == 0
     }
@@ -602,14 +591,12 @@ private object BytesSerializer : PrimitiveSerializer<ByteString>(), PrimitiveDes
         }
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.BYTES
+    override val typeName get() = "bytes"
+    override val primitiveType get() = PrimitiveType.BYTES
+    override val typeDescriptor get() = this
 }
 
-private object TimestampSerializer : PrimitiveSerializer<Instant>(), PrimitiveDescritor {
+private object TimestampSerializer : PrimitiveSerializer<Instant>(), PrimitiveDescriptor {
     override fun isDefault(value: Instant): Boolean {
         return value == Instant.EPOCH
     }
@@ -684,14 +671,12 @@ private object TimestampSerializer : PrimitiveSerializer<Instant>(), PrimitiveDe
         return unixMillis.coerceIn(-8640000000000000, 8640000000000000)
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
-
-    override val primitiveType: PrimitiveType
-        get() = PrimitiveType.TIMESTAMP
+    override val typeName get() = "timestamp"
+    override val primitiveType get() = PrimitiveType.TIMESTAMP
+    override val typeDescriptor get() = this
 }
 
-private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerImpl<T?>(), OptionalDescriptor {
+private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerImpl<T?>(), OptionalDescriptor.Reflective {
     override fun isDefault(value: T?): Boolean {
         return value == null
     }
@@ -753,7 +738,7 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
         }
     }
 
-    override val otherType: TypeDescriptor
+    override val otherType: TypeDescriptor.Reflective
         get() = other.typeDescriptor
 
     override val typeSignature: JsonElement
@@ -769,6 +754,5 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
         other.addRecordDefinitionsTo(out)
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
+    override val typeDescriptor get() = this
 }

@@ -1,28 +1,29 @@
 package land.soia.internal
 
-import RecordId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
-import land.soia.RecordDescriptor
 import land.soia.Serializer
-import land.soia.StructDescriptor
-import land.soia.TypeDescriptor
+import land.soia.reflection.RecordDescriptor
+import land.soia.reflection.StructDescriptor
+import land.soia.reflection.StructField
+import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
 
 class StructSerializer<Frozen : Any, Mutable : Any>(
     recordId: String,
-    val getParentTypeFn: () -> RecordDescriptor?,
+    override val parentType: RecordDescriptor<*>?,
     private val defaultInstance: Frozen,
-    private val newMutableFn: () -> Mutable,
+    private val newMutableFn: (Frozen?) -> Mutable,
     private val toFrozenFn: (Mutable) -> Frozen,
     private val getUnrecognizedFields: (Frozen) -> UnrecognizedFields<Frozen>?,
     private val setUnrecognizedFields: (Mutable, UnrecognizedFields<Frozen>) -> Unit,
-) : RecordSerializer<Frozen>(), StructDescriptor<Frozen, Mutable> {
-    override val parsedRecordId: RecordId = RecordId.parse(recordId)
+) : RecordSerializer<Frozen, StructField.Reflective<Frozen, Mutable, *>>(),
+    StructDescriptor.Reflective<Frozen, Mutable> {
+    override val parsedRecordId = RecordId.parse(recordId)
 
     private data class Field<Frozen : Any, Mutable : Any, Value>(
         override val name: String,
@@ -31,7 +32,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
         val serializer: Serializer<Value>,
         val getter: (Frozen) -> Value,
         val setter: (Mutable, Value) -> Unit,
-    ) : StructDescriptor.Field<Frozen, Mutable, Value> {
+    ) : StructField.Reflective<Frozen, Mutable, Value> {
         fun valueIsDefault(input: Frozen): Boolean {
             return serializer.impl.isDefault(getter(input))
         }
@@ -76,7 +77,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
             serializer.impl.appendString(getter(input), out, eolIndent)
         }
 
-        override val type: TypeDescriptor
+        override val type: TypeDescriptor.Reflective
             get() = serializer.impl.typeDescriptor
 
         override fun set(
@@ -218,7 +219,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
         jsonArray: JsonArray,
         keepUnrecognizedFields: Boolean,
     ): Frozen {
-        val mutable = newMutableFn()
+        val mutable = newMutableFn(null)
         val numSlotsToFill: Int
         if (jsonArray.size > recognizedSlotCount) {
             // We have some unrecognized fields.
@@ -245,7 +246,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
     }
 
     private fun fromReadableJson(jsonObject: JsonObject): Frozen {
-        val mutable = newMutableFn()
+        val mutable = newMutableFn(null)
         for ((name, element) in jsonObject) {
             nameToField[name]?.valueFromJson(mutable, element, keepUnrecognizedFields = false)
         }
@@ -301,7 +302,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
         if (wire == 0 || wire == 246) {
             return defaultInstance
         }
-        val mutable = newMutableFn()
+        val mutable = newMutableFn(null)
         val encodedSlotCount =
             if (wire == 250) {
                 decodeNumber(buffer).toInt()
@@ -391,10 +392,8 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
     // REFLECTION: BEGIN
     // =========================================================================
 
-    override val parentType: RecordDescriptor?
-        get() = getParentTypeFn()
-
-    override val fields: List<StructDescriptor.Field<Frozen, Mutable, *>> get() = java.util.Collections.unmodifiableList(mutableFields)
+    override val fields: List<StructField.Reflective<Frozen, Mutable, *>> get() =
+        java.util.Collections.unmodifiableList(mutableFields)
 
     override val removedNumbers: Set<Int> get() = java.util.Collections.unmodifiableSet(mutableRemovedNumbers)
 
@@ -414,20 +413,19 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
         return mutableFields.map { it.serializer.impl }
     }
 
-    override fun getField(name: String): StructDescriptor.Field<Frozen, Mutable, *>? {
+    override fun getField(name: String): StructField.Reflective<Frozen, Mutable, *>? {
         return nameToField[name]
     }
 
-    override fun getField(number: Int): StructDescriptor.Field<Frozen, Mutable, *>? {
+    override fun getField(number: Int): StructField.Reflective<Frozen, Mutable, *>? {
         return if (number < slotToField.size) slotToField[number] else null
     }
 
-    override fun newMutable(initializer: Frozen?) = newMutableFn()
+    override fun newMutable(initializer: Frozen?) = newMutableFn(initializer)
 
     override fun toFrozen(mutable: Mutable) = toFrozenFn(mutable)
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
+    override val typeDescriptor get() = this
 
     // =========================================================================
     // REFLECTION: END

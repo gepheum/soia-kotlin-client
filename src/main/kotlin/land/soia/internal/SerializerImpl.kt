@@ -1,10 +1,8 @@
 package land.soia.internal
 
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import land.soia.TypeDescriptor
-import land.soia.TypeDescriptorBase
+import land.soia.reflection.TypeDescriptor
+import land.soia.reflection.TypeDescriptorBase
 import okio.Buffer
 import okio.BufferedSource
 
@@ -37,22 +35,11 @@ abstract class SerializerImpl<T> : TypeDescriptorBase {
         eolIndent: String,
     )
 
-    internal abstract val typeDescriptor: TypeDescriptor
+    internal abstract val typeDescriptor: TypeDescriptor.Reflective
 
     internal abstract val typeSignature: JsonElement
 
     abstract fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>)
-
-    override fun asJson(): JsonObject {
-        val recordDefinitions = mutableMapOf<String, JsonElement>()
-        addRecordDefinitionsTo(recordDefinitions)
-        return JsonObject(
-            mapOf(
-                "type" to typeSignature,
-                "records" to JsonArray(recordDefinitions.values.toList()),
-            ),
-        )
-    }
 }
 
 internal const val INDENT_UNIT: String = "  "

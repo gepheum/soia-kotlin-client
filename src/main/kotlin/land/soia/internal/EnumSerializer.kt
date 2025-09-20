@@ -1,37 +1,39 @@
 package land.soia.internal
 
-import RecordId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import land.soia.EnumDescriptor
-import land.soia.RecordDescriptor
 import land.soia.Serializer
-import land.soia.TypeDescriptor
+import land.soia.reflection.EnumConstantField
+import land.soia.reflection.EnumDescriptor
+import land.soia.reflection.EnumField
+import land.soia.reflection.EnumValueField
+import land.soia.reflection.RecordDescriptor
+import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
 
 class EnumSerializer<Enum : Any> private constructor(
     recordId: String,
-    val getParentTypeFn: () -> RecordDescriptor?,
+    override val parentType: RecordDescriptor<*>?,
     private val unknown: UnknownField<Enum>,
-) : RecordSerializer<Enum>(), EnumDescriptor<Enum> {
-    override val parsedRecordId: RecordId = RecordId.parse(recordId)
+) : RecordSerializer<Enum, EnumField.Reflective<Enum>>(), EnumDescriptor.Reflective<Enum> {
+    override val parsedRecordId = RecordId.parse(recordId)
 
     companion object {
         @Suppress("UNCHECKED_CAST")
         fun <Enum : Any, Unknown : Enum> create(
             recordId: String,
-            getParentTypeFn: () -> RecordDescriptor?,
+            parentType: RecordDescriptor<*>?,
             unknownInstance: Unknown,
             wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Unknown,
             getUnrecognized: (Unknown) -> UnrecognizedEnum<Enum>?,
         ) = EnumSerializer(
             recordId,
-            getParentTypeFn,
+            parentType,
             unknown =
                 UnknownField(
                     unknownInstance.javaClass,
@@ -94,7 +96,7 @@ class EnumSerializer<Enum : Any> private constructor(
             eolIndent: String,
         )
 
-        fun asDescriptorField(): EnumDescriptor.Field<Enum> {
+        fun asDescriptorField(): EnumField.Reflective<Enum> {
             return when (this) {
                 is UnknownField<Enum> -> this
                 is ConstantField<Enum, *> -> this
@@ -108,7 +110,7 @@ class EnumSerializer<Enum : Any> private constructor(
         override val constant: Enum,
         val wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Enum,
         private val getUnrecognized: (Enum) -> UnrecognizedEnum<Enum>?,
-    ) : Field<Enum>(), EnumDescriptor.ConstantField<Enum> {
+    ) : Field<Enum>(), EnumConstantField.Reflective<Enum> {
         override val number get() = 0
         override val name get() = "?"
 
@@ -151,7 +153,7 @@ class EnumSerializer<Enum : Any> private constructor(
         override val name: String,
         override val instanceType: Class<Instance>,
         override val constant: Enum,
-    ) : Field<Enum>(), EnumDescriptor.ConstantField<Enum> {
+    ) : Field<Enum>(), EnumConstantField.Reflective<Enum> {
         override fun toJson(
             input: Enum,
             readableFlavor: Boolean,
@@ -183,7 +185,7 @@ class EnumSerializer<Enum : Any> private constructor(
         val valueSerializer: Serializer<T>,
         val wrapFn: (T) -> Enum,
         val getValue: (Enum) -> T,
-    ) : Field<Enum>(), EnumDescriptor.ValueField<Enum, T> {
+    ) : Field<Enum>(), EnumValueField.Reflective<Enum, T> {
         override fun toJson(
             input: Enum,
             readableFlavor: Boolean,
@@ -228,7 +230,7 @@ class EnumSerializer<Enum : Any> private constructor(
             out.append(eolIndent).append(')')
         }
 
-        override val typeDescriptor: TypeDescriptor
+        override val type: TypeDescriptor.Reflective
             get() = valueSerializer.impl.typeDescriptor
 
         override fun test(e: Enum): Boolean {
@@ -282,7 +284,7 @@ class EnumSerializer<Enum : Any> private constructor(
         }
     }
 
-    private val mutableFields = mutableListOf<EnumDescriptor.Field<Enum>>()
+    private val mutableFields = mutableListOf<EnumField.Reflective<Enum>>()
     private val mutableRemovedNumbers = mutableSetOf<Int>()
     private val numberToField = mutableMapOf<Int, FieldOrRemoved<Enum>>()
     private val nameToField = mutableMapOf<String, Field<Enum>>()
@@ -435,10 +437,7 @@ class EnumSerializer<Enum : Any> private constructor(
     // REFLECTION: BEGIN
     // =========================================================================
 
-    override val parentType: RecordDescriptor?
-        get() = getParentTypeFn()
-
-    override val fields: List<EnumDescriptor.Field<Enum>>
+    override val fields: List<EnumField.Reflective<Enum>>
         get() = java.util.Collections.unmodifiableList(mutableFields)
 
     override val removedNumbers: Set<Int>
@@ -479,25 +478,24 @@ class EnumSerializer<Enum : Any> private constructor(
         return fields.filterIsInstance<ValueField<*, *>>().map { it.valueSerializer.impl }
     }
 
-    override fun getField(name: String): EnumDescriptor.Field<Enum>? {
+    override fun getField(name: String): EnumField.Reflective<Enum>? {
         val field = nameToField[name]
         return field?.asDescriptorField()
     }
 
-    override fun getField(number: Int): EnumDescriptor.Field<Enum>? {
+    override fun getField(number: Int): EnumField.Reflective<Enum>? {
         return when (val field = numberToField[number]) {
             is Field<Enum> -> field.asDescriptorField()
             null, is RemovedNumber<Enum> -> null
         }
     }
 
-    override fun getField(e: Enum): EnumDescriptor.Field<Enum> {
+    override fun getField(e: Enum): EnumField.Reflective<Enum> {
         val field = instanceTypeToField[e.javaClass]!!
         return field.asDescriptorField()
     }
 
-    override val typeDescriptor: TypeDescriptor
-        get() = this
+    override val typeDescriptor get() = this
 
     // =========================================================================
     // REFLECTION: END

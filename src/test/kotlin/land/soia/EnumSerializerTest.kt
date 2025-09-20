@@ -7,6 +7,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import land.soia.internal.EnumSerializer
 import land.soia.internal.UnrecognizedEnum
 import land.soia.internal.toStringImpl
+import land.soia.reflection.asJson
+import land.soia.reflection.asJsonCode
+import land.soia.reflection.parseTypeDescriptor
 import org.junit.jupiter.api.Test
 
 class EnumSerializerTest {
@@ -43,7 +46,7 @@ class EnumSerializerTest {
     private val colorEnumSerializer =
         EnumSerializer.create<Color, Color.Unknown>(
             "foo.bar:Color",
-            { null },
+            null,
             Color.UNKNOWN,
             { unrecognized -> Color.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
@@ -59,7 +62,7 @@ class EnumSerializerTest {
     private val statusEnumSerializer =
         EnumSerializer.create<Status, Status.Unknown>(
             "foo.bar:Color.Status",
-            { colorEnumSerializer },
+            colorEnumSerializer,
             Status.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
             { unrecognized -> Status.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
@@ -292,7 +295,7 @@ class EnumSerializerTest {
         val testEnumSerializer =
             EnumSerializer.create<Color, Color.Unknown>(
                 "foo.bar:Color",
-                { null },
+                null,
                 Color.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
                 { unrecognized -> Color.Unknown(unrecognized) },
                 { enum -> enum.unrecognized },
@@ -441,6 +444,58 @@ class EnumSerializerTest {
             "EnumSerializerTest.Status.PendingOption(\n" +
                 "  \"foo\\n\" +\n    \"bar\"\n" +
                 ")",
+        )
+    }
+
+    @Test
+    fun `test enum serializer - type descriptor`() {
+        val expectedJson =
+            "{\n" +
+                "  \"records\": [\n" +
+                "    {\n" +
+                "      \"kind\": \"enum\",\n" +
+                "      \"id\": \"foo.bar:Color.Status\",\n" +
+                "      \"fields\": [\n" +
+                "        {\n" +
+                "          \"name\": \"active\",\n" +
+                "          \"number\": 1\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"name\": \"inactive\",\n" +
+                "          \"number\": 2\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"name\": \"pending\",\n" +
+                "          \"number\": 3,\n" +
+                "          \"type\": {\n" +
+                "            \"kind\": \"primitive\",\n" +
+                "            \"value\": \"string\"\n" +
+                "          }\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"name\": \"?\",\n" +
+                "          \"number\": 0\n" +
+                "        }\n" +
+                "      ],\n" +
+                "      \"removed_fields\": [\n" +
+                "        4\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  ],\n" +
+                "  \"type\": {\n" +
+                "    \"kind\": \"record\",\n" +
+                "    \"value\": \"foo.bar:Color.Status\"\n" +
+                "  }\n" +
+                "}"
+        assertThat(
+            statusSerializer.typeDescriptor.asJsonCode(),
+        ).isEqualTo(
+            expectedJson,
+        )
+        assertThat(
+            parseTypeDescriptor(statusSerializer.typeDescriptor.asJson()).asJsonCode(),
+        ).isEqualTo(
+            expectedJson,
         )
     }
 }
