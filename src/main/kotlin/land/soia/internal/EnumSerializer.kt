@@ -495,7 +495,7 @@ class EnumSerializer<Enum : Any> private constructor(
         return field.asDescriptorField()
     }
 
-    override val typeDescriptor get() = this
+    public override val typeDescriptor get() = this
 
     // =========================================================================
     // REFLECTION: END

@@ -425,11 +425,11 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
 
     override fun toFrozen(mutable: Mutable) = toFrozenFn(mutable)
 
-    override val typeDescriptor get() = this
+    public override val typeDescriptor get() = this
 
     // =========================================================================
     // REFLECTION: END
-    // =========================================================================
+// =========================================================================
 
     private companion object {
         val EMPTY_JSON_ARRAY = JsonArray(emptyList())

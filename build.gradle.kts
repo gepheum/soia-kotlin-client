@@ -37,7 +37,7 @@ mavenPublishing {
     coordinates(
         groupId = "land.soia",
         artifactId = "soia-kotlin-client",
-        version = "1.0.10",
+        version = "1.0.11",
     )
 
     // Configure POM metadata for the published artifact
