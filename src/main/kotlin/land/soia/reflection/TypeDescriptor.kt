@@ -74,12 +74,6 @@ interface RecordDescriptorBase<Field : FieldBase> : TypeDescriptorBase {
      */
     val modulePath: String
 
-    /**
-     * If the struct is nested within another type, the descriptor for that type.
-     * Undefined if the struct is defined at the top-level of the module.
-     */
-    val parentType: RecordDescriptor<*>?
-
     /** The field numbers marked as removed. */
     val removedNumbers: Set<Int>
 

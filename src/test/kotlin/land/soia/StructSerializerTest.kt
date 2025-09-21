@@ -38,7 +38,6 @@ class StructSerializerTest {
     private val personStructSerializer =
         StructSerializer<PersonFrozen, PersonMutable>(
             "foo:Person",
-            null,
             defaultInstance = defaultPerson,
             newMutableFn = { PersonMutable() },
             toFrozenFn = { mutable ->
@@ -312,7 +311,6 @@ class StructSerializerTest {
         val testSerializer =
             StructSerializer<PersonFrozen, PersonMutable>(
                 "foo:Person",
-                null,
                 defaultInstance = defaultPerson,
                 newMutableFn = { PersonMutable() },
                 toFrozenFn = { PersonFrozen() },
@@ -365,7 +363,6 @@ class StructSerializerTest {
         val serializerWithRemovedFields =
             StructSerializer<SimpleStruct, SimpleMutable>(
                 "foo:Simple",
-                null,
                 defaultInstance = defaultSimple,
                 newMutableFn = { SimpleMutable() },
                 toFrozenFn = { mutable -> SimpleStruct(mutable.name, mutable.value) },
@@ -459,7 +456,6 @@ class StructSerializerTest {
     private val partialPersonStructSerializer =
         StructSerializer<PartialPersonFrozen, PartialPersonMutable>(
             "foo:Person",
-            null,
             defaultInstance = PartialPersonFrozen(),
             newMutableFn = { PartialPersonMutable() },
             toFrozenFn = { mutable ->

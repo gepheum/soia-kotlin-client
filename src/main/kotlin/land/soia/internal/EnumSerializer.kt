@@ -18,7 +18,6 @@ import okio.BufferedSource
 
 class EnumSerializer<Enum : Any> private constructor(
     recordId: String,
-    override val parentType: RecordDescriptor<*>?,
     private val unknown: UnknownField<Enum>,
 ) : RecordSerializer<Enum, EnumField.Reflective<Enum>>(), EnumDescriptor.Reflective<Enum> {
     override val parsedRecordId = RecordId.parse(recordId)
@@ -33,7 +32,6 @@ class EnumSerializer<Enum : Any> private constructor(
             getUnrecognized: (Unknown) -> UnrecognizedEnum<Enum>?,
         ) = EnumSerializer(
             recordId,
-            parentType,
             unknown =
                 UnknownField(
                     unknownInstance.javaClass,

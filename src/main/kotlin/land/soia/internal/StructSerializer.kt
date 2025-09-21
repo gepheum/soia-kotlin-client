@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import land.soia.Serializer
-import land.soia.reflection.RecordDescriptor
 import land.soia.reflection.StructDescriptor
 import land.soia.reflection.StructField
 import land.soia.reflection.TypeDescriptor
@@ -15,7 +14,6 @@ import okio.BufferedSource
 
 class StructSerializer<Frozen : Any, Mutable : Any>(
     recordId: String,
-    override val parentType: RecordDescriptor<*>?,
     private val defaultInstance: Frozen,
     private val newMutableFn: (Frozen?) -> Mutable,
     private val toFrozenFn: (Mutable) -> Frozen,

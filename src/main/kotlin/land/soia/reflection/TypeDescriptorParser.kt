@@ -95,8 +95,6 @@ private sealed class RecordDescriptorImpl<Field : FieldBase>(
     final override val qualifiedName: String get() = recordId.qualifiedName
     final override val modulePath: String get() = recordId.modulePath
 
-    override var parentType: RecordDescriptor<*>? = null
-
     override fun getField(name: String): Field? {
         return nameToField[name]
     }
