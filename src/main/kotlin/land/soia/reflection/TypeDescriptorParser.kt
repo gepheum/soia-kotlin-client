@@ -9,6 +9,15 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import land.soia.internal.RecordId
 
+/**
+ * Parses a type descriptor from its JSON representation.
+ *
+ * This function takes a JSON element containing a serialized type descriptor
+ * and reconstructs the corresponding TypeDescriptor object.
+ *
+ * @param json The JSON element containing the type descriptor data
+ * @return The parsed TypeDescriptor
+ */
 fun parseTypeDescriptor(json: JsonElement): TypeDescriptor {
     val jsonObject = json.jsonObject
     val records = jsonObject["records"]?.jsonArray ?: listOf()
@@ -53,6 +62,12 @@ fun parseTypeDescriptor(json: JsonElement): TypeDescriptor {
     return parseTypeDescriptorImpl(type, recordIdToBundle)
 }
 
+/**
+ * Parses a type descriptor from its JSON string representation.
+ *
+ * @param jsonCode The JSON string containing the type descriptor data
+ * @return The parsed TypeDescriptor
+ */
 fun parseTypeDescriptor(jsonCode: String): TypeDescriptor {
     val jsonElement = Json.Default.decodeFromString(JsonElement.serializer(), jsonCode)
     return parseTypeDescriptor(jsonElement)

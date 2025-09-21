@@ -8,9 +8,27 @@ import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.ByteString
 
+/**
+ * A serializer for converting objects of type [T] to and from various formats including JSON and binary.
+ *
+ * This class provides comprehensive serialization capabilities for Soia types, supporting both
+ * human-readable JSON and efficient binary encoding formats.
+ *
+ * @param T The type of objects this serializer can handle
+ */
 class Serializer<T> internal constructor(
     internal val impl: SerializerImpl<T>,
 ) {
+    /**
+     * Converts an object to its JSON representation.
+     *
+     * @param input The object to serialize
+     * @param readableFlavor Whether to produce a more human-readable and less compact
+     *     JSON representation. Not suitable for persistencence: renaming fields in
+     *     the '.soia' file, which is allowed by design, will break backward
+     *     compatibility.
+     * @return The JSON representation as a JsonElement
+     */
     fun toJson(
         input: T,
         mustNameArguments: MustNameArguments = MustNameArguments,
@@ -19,6 +37,16 @@ class Serializer<T> internal constructor(
         return this.impl.toJson(input, readableFlavor = readableFlavor)
     }
 
+    /**
+     * Converts an object to its JSON string representation.
+     *
+     * @param input The object to serialize
+     * @param readableFlavor Whether to produce a more human-readable and less compact
+     *     JSON representation. Not suitable for persistencence: renaming fields in
+     *     the '.soia' file, which is allowed by design, will break backward
+     *     compatibility.
+     * @return The JSON representation as a string
+     */
     fun toJsonCode(
         input: T,
         mustNameArguments: MustNameArguments = MustNameArguments,
@@ -32,6 +60,16 @@ class Serializer<T> internal constructor(
         }
     }
 
+    /**
+     * Deserializes an object from its JSON representation.
+     *
+     * @param json The JSON element to deserialize
+     * @param readableFlavor Whether to produce a more human-readable and less compact
+     *     JSON representation. Not suitable for persistencence: renaming fields in
+     *     the '.soia' file, which is allowed by design, will break backward
+     *     compatibility.
+     * @return The deserialized object
+     */
     fun fromJson(
         json: JsonElement,
         mustNameArguments: MustNameArguments = MustNameArguments,
@@ -40,6 +78,16 @@ class Serializer<T> internal constructor(
         return this.impl.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields)
     }
 
+    /**
+     * Deserializes an object from its JSON string representation.
+     *
+     * @param jsonCode The JSON string to deserialize
+     * @param readableFlavor Whether to produce a more human-readable and less compact
+     *     JSON representation. Not suitable for persistencence: renaming fields in
+     *     the '.soia' file, which is allowed by design, will break backward
+     *     compatibility.
+     * @return The deserialized object
+     */
     fun fromJsonCode(
         jsonCode: String,
         mustNameArguments: MustNameArguments = MustNameArguments,
@@ -49,6 +97,15 @@ class Serializer<T> internal constructor(
         return this.impl.fromJson(jsonElement, keepUnrecognizedFields = keepUnrecognizedFields)
     }
 
+    /**
+     * Converts an object to its binary representation.
+     *
+     * The binary format includes a "soia" header followed by the encoded data,
+     * providing an efficient storage format for Soia objects.
+     *
+     * @param input The object to serialize
+     * @return The binary representation as a ByteString
+     */
     fun toBytes(input: T): ByteString {
         val buffer = Buffer()
         buffer.writeUtf8("soia")
@@ -56,6 +113,16 @@ class Serializer<T> internal constructor(
         return buffer.readByteString()
     }
 
+    /**
+     * Deserializes an object from its binary representation.
+     *
+     * @param bytes The byte array containing the serialized data
+     * @param readableFlavor Whether to produce a more human-readable and less compact
+     *     JSON representation. Not suitable for persistencence: renaming fields in
+     *     the '.soia' file, which is allowed by design, will break backward
+     *     compatibility.
+     * @return The deserialized object
+     */
     fun fromBytes(
         bytes: ByteArray,
         mustNameArguments: MustNameArguments = MustNameArguments,
@@ -66,6 +133,16 @@ class Serializer<T> internal constructor(
         return this.fromBytes(buffer, keepUnrecognizedFields = keepUnrecognizedFields)
     }
 
+    /**
+     * Deserializes an object from its binary representation.
+     *
+     * @param bytes The ByteString containing the serialized data
+     * @param readableFlavor Whether to produce a more human-readable and less compact
+     *     JSON representation. Not suitable for persistencence: renaming fields in
+     *     the '.soia' file, which is allowed by design, will break backward
+     *     compatibility.
+     * @return The deserialized object
+     */
     fun fromBytes(
         bytes: ByteString,
         mustNameArguments: MustNameArguments = MustNameArguments,
@@ -95,6 +172,12 @@ class Serializer<T> internal constructor(
         }
     }
 
+    /**
+     * Gets the type descriptor that describes the structure of type [T].
+     *
+     * This provides reflective information about the type, including field names,
+     * types, and other metadata useful for introspection and tooling.
+     */
     val typeDescriptor: TypeDescriptor.Reflective get() = this.impl.typeDescriptor
 
     companion object {

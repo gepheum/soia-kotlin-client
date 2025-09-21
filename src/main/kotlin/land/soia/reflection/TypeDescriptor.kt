@@ -8,42 +8,75 @@ import kotlinx.serialization.json.JsonPrimitive
 
 interface TypeDescriptorBase
 
+/**
+ * Describes a Soia type.
+ */
 sealed interface TypeDescriptor : TypeDescriptorBase {
+    /**
+     * Adds runtime introspection capabilities to a [TypeDescriptor].
+     */
     sealed interface Reflective : TypeDescriptorBase
 }
 
+/**
+ * Enumeration of all primitive types supported by Soia.
+ */
 enum class PrimitiveType {
+    /** Boolean true/false values. */
     BOOL,
+    /** 32-bit signed integers. */
     INT_32,
+    /** 64-bit signed integers. */
     INT_64,
+    /** 64-bit unsigned integers. */
     UINT_64,
+    /** 32-bit floating-point numbers. */
     FLOAT_32,
+    /** 64-bit floating-point numbers. */
     FLOAT_64,
+    /** Timestamp values representing instants in time. */
     TIMESTAMP,
+    /** UTF-8 encoded text strings. */
     STRING,
+    /** Binary data (byte sequences). */
     BYTES,
 }
 
+/**
+ * Describes a primitive type such as integers, strings, booleans, etc.
+ */
 interface PrimitiveDescriptor : TypeDescriptor, TypeDescriptor.Reflective {
+    /** The specific primitive type being described. */
     val primitiveType: PrimitiveType
 }
 
+/**
+ * Base interface for optional type descriptors.
+ *
+ * @param OtherType The type descriptor for the wrapped non-optional type
+ */
 interface OptionalDescriptorBase<OtherType : TypeDescriptorBase> : TypeDescriptorBase {
+    /** The type descriptor for the wrapped non-optional type. */
     val otherType: OtherType
 }
 
+/**
+ * Describes an optional type that can hold either a value of the wrapped type or null.
+ */
 interface OptionalDescriptor : TypeDescriptor, OptionalDescriptorBase<TypeDescriptor> {
     interface Reflective : TypeDescriptor.Reflective, OptionalDescriptorBase<TypeDescriptor.Reflective>
 }
 
-/** Base interface of `ListDescriptor` and `ListDescriptor.Reflective`. */
 interface ListDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptor {
     /** Describes the type of the array items. */
     val itemType: ItemType
+    /** Optional key chain for keyed lists that support fast lookup by key. */
     val keyChain: String?
 }
 
-/** Describes a list type. */
+/**
+ * Describes a list type containing elements of a specific type.
+ */
 interface ListDescriptor : ListDescriptorBase<TypeDescriptor>, TypeDescriptor {
     interface Reflective : ListDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
 }
@@ -77,13 +110,29 @@ interface RecordDescriptorBase<Field : FieldBase> : TypeDescriptorBase {
     /** The field numbers marked as removed. */
     val removedNumbers: Set<Int>
 
+    /** List of all fields in this record. */
     val fields: List<Field>
 
+    /**
+     * Looks up a field by name.
+     *
+     * @param name The field name to search for
+     * @return The field with the given name, or null if not found
+     */
     fun getField(name: String): Field?
 
+    /**
+     * Looks up a field by number.
+     *
+     * @param number The field number to search for
+     * @return The field with the given number, or null if not found
+     */
     fun getField(number: Int): Field?
 }
 
+/**
+ * Describes a record type (struct or enum).
+ */
 sealed interface RecordDescriptor<Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor {
     interface Reflective<Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor.Reflective
 }
@@ -106,9 +155,11 @@ interface StructField : StructFieldBase<TypeDescriptor> {
     }
 }
 
-/** Describes a Soia struct. */
 interface StructDescriptorBase<Field : StructFieldBase<*>> : RecordDescriptorBase<Field>
 
+/**
+ * Describes a Soia struct type with its fields and structure.
+ */
 interface StructDescriptor : StructDescriptorBase<StructField>, RecordDescriptor<StructField> {
     interface Reflective<Frozen, Mutable> :
         StructDescriptorBase<StructField.Reflective<Frozen, Mutable, *>>,
@@ -119,6 +170,9 @@ interface StructDescriptor : StructDescriptorBase<StructField>, RecordDescriptor
          */
         fun newMutable(initializer: Frozen?): Mutable
 
+        /**
+         * Converts a mutable struct instance to its frozen (immutable) form.
+         */
         fun toFrozen(mutable: Mutable): Frozen
     }
 }
@@ -129,17 +183,31 @@ sealed interface EnumField : FieldBase {
 
 interface EnumConstantFieldBase : FieldBase
 
+/**
+ * Describes an enum constant field (a field that represents a simple named value).
+ */
 interface EnumConstantField : EnumConstantFieldBase, EnumField {
     interface Reflective<Enum> : EnumConstantFieldBase, EnumField.Reflective<Enum> {
+        /** The constant value represented by this field. */
         val constant: Enum
     }
 }
 
 interface EnumValueFieldBase<TypeDescriptor : TypeDescriptorBase> : EnumField {
+    /** The type of the value associated with this enum field. */
     val type: TypeDescriptor
 }
 
+/**
+ * Describes an enum value field (a field that can hold additional data).
+ */
 interface EnumValueField : EnumValueFieldBase<TypeDescriptor>, EnumField {
+    /**
+     * Reflective interface for enum value fields.
+     *
+     * @param Enum The enum type
+     * @param Value The type of the associated value
+     */
     interface Reflective<Enum, Value> : EnumValueFieldBase<TypeDescriptor.Reflective>, EnumField.Reflective<Enum> {
         /** Returns whether the given enum instance if it matches this enum field. */
         fun test(e: Enum): Boolean
@@ -160,26 +228,53 @@ interface EnumValueField : EnumValueFieldBase<TypeDescriptor>, EnumField {
 
 interface EnumDescriptorBase<Field : FieldBase> : RecordDescriptor<Field>
 
-/** Describes a Soia enum. */
+/**
+ * Describes a Soia enum type with its possible values and associated data.
+ */
 interface EnumDescriptor : EnumDescriptorBase<EnumField>, RecordDescriptor<EnumField> {
+    /**
+     * Reflective interface for enum descriptors.
+     *
+     * @param Enum The enum type
+     */
     interface Reflective<Enum> : EnumDescriptorBase<EnumField.Reflective<Enum>>, RecordDescriptor.Reflective<EnumField.Reflective<Enum>> {
         /** Looks up the field corresponding to the given instance of Enum. */
         fun getField(e: Enum): EnumField.Reflective<Enum>
     }
 }
 
+/**
+ * Converts this type descriptor to its JSON representation.
+ *
+ * @return A JsonObject containing the complete type information
+ */
 fun TypeDescriptor.asJson(): JsonObject {
     return asJsonImpl(this)
 }
 
+/**
+ * Converts this type descriptor to a JSON string representation.
+ *
+ * @return A pretty-printed JSON string describing the type
+ */
 fun TypeDescriptor.asJsonCode(): String {
     return readableJson.encodeToString(JsonElement.serializer(), asJson())
 }
 
+/**
+ * Converts this reflective type descriptor to its JSON representation.
+ *
+ * @return A JsonObject containing the complete type information
+ */
 fun TypeDescriptor.Reflective.asJson(): JsonObject {
     return asJsonImpl(this)
 }
 
+/**
+ * Converts this reflective type descriptor to a JSON string representation.
+ *
+ * @return A pretty-printed JSON string describing the type
+ */
 fun TypeDescriptor.Reflective.asJsonCode(): String {
     return readableJson.encodeToString(JsonElement.serializer(), asJson())
 }
