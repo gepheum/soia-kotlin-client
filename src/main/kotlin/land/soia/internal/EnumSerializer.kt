@@ -11,7 +11,6 @@ import land.soia.reflection.EnumConstantField
 import land.soia.reflection.EnumDescriptor
 import land.soia.reflection.EnumField
 import land.soia.reflection.EnumValueField
-import land.soia.reflection.RecordDescriptor
 import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
@@ -26,7 +25,6 @@ class EnumSerializer<Enum : Any> private constructor(
         @Suppress("UNCHECKED_CAST")
         fun <Enum : Any, Unknown : Enum> create(
             recordId: String,
-            parentType: RecordDescriptor<*>?,
             unknownInstance: Unknown,
             wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Unknown,
             getUnrecognized: (Unknown) -> UnrecognizedEnum<Enum>?,

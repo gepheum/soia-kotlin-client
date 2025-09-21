@@ -46,7 +46,6 @@ class EnumSerializerTest {
     private val colorEnumSerializer =
         EnumSerializer.create<Color, Color.Unknown>(
             "foo.bar:Color",
-            null,
             Color.UNKNOWN,
             { unrecognized -> Color.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
@@ -62,7 +61,6 @@ class EnumSerializerTest {
     private val statusEnumSerializer =
         EnumSerializer.create<Status, Status.Unknown>(
             "foo.bar:Color.Status",
-            colorEnumSerializer,
             Status.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
             { unrecognized -> Status.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
@@ -295,7 +293,6 @@ class EnumSerializerTest {
         val testEnumSerializer =
             EnumSerializer.create<Color, Color.Unknown>(
                 "foo.bar:Color",
-                null,
                 Color.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
                 { unrecognized -> Color.Unknown(unrecognized) },
                 { enum -> enum.unrecognized },
