@@ -36,20 +36,28 @@ import java.time.format.DateTimeFormatter
 object Serializers {
     /** Serializer for Boolean values. */
     val bool: Serializer<Boolean> = Serializer(BoolSerializer)
+
     /** Serializer for 32-bit signed integers. */
     val int32: Serializer<Int> = Serializer(Int32Serializer)
+
     /** Serializer for 64-bit signed integers. */
     val int64: Serializer<Long> = Serializer(Int64Serializer)
+
     /** Serializer for 64-bit unsigned integers. */
     val uint64: Serializer<ULong> = Serializer(Uint64Serializer)
+
     /** Serializer for 32-bit floating-point numbers. */
     val float32: Serializer<Float> = Serializer(Float32Serializer)
+
     /** Serializer for 64-bit floating-point numbers. */
     val float64: Serializer<Double> = Serializer(Float64Serializer)
+
     /** Serializer for UTF-8 strings. */
     val string: Serializer<String> = Serializer(StringSerializer)
+
     /** Serializer for binary data (byte arrays). */
     val bytes: Serializer<ByteString> = Serializer(BytesSerializer)
+
     /** Serializer for timestamp values. */
     val timestamp: Serializer<Instant> = Serializer(TimestampSerializer)
 

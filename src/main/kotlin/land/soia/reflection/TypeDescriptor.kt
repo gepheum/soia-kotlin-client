@@ -24,20 +24,28 @@ sealed interface TypeDescriptor : TypeDescriptorBase {
 enum class PrimitiveType {
     /** Boolean true/false values. */
     BOOL,
+
     /** 32-bit signed integers. */
     INT_32,
+
     /** 64-bit signed integers. */
     INT_64,
+
     /** 64-bit unsigned integers. */
     UINT_64,
+
     /** 32-bit floating-point numbers. */
     FLOAT_32,
+
     /** 64-bit floating-point numbers. */
     FLOAT_64,
+
     /** Timestamp values representing instants in time. */
     TIMESTAMP,
+
     /** UTF-8 encoded text strings. */
     STRING,
+
     /** Binary data (byte sequences). */
     BYTES,
 }
@@ -70,6 +78,7 @@ interface OptionalDescriptor : TypeDescriptor, OptionalDescriptorBase<TypeDescri
 interface ListDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptor {
     /** Describes the type of the array items. */
     val itemType: ItemType
+
     /** Optional key chain for keyed lists that support fast lookup by key. */
     val keyChain: String?
 }
