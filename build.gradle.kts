@@ -4,10 +4,11 @@ plugins {
     kotlin("jvm") version "2.0.0"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
     id("com.vanniktech.maven.publish") version "0.28.0"
+    id("org.jetbrains.dokka") version "1.9.10"
 }
 
-group = "com.gepheum.soia"
-version = "1.0.0"
+group = "land.soia"
+version = "1.0.13"
 
 kotlin {
     compilerOptions {
@@ -31,6 +32,23 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Configure Dokka for HTML documentation
+tasks.dokkaHtml.configure {
+    outputDirectory.set(layout.buildDirectory.dir("dokka"))
+}
+
+// Generate Javadoc-style documentation
+tasks.dokkaJavadoc.configure {
+    outputDirectory.set(layout.buildDirectory.dir("docs/javadoc"))
+}
+
+// Convenient alias for generating documentation
+tasks.register("generateDocs") {
+    description = "Generates all documentation (HTML and Javadoc)"
+    group = "documentation"
+    dependsOn(tasks.dokkaHtml, tasks.dokkaJavadoc)
+}
+
 // From https://proandroiddev.com/publishing-kotlin-multiplatform-libraries-with-sonatype-central-b40f7cc6866e
 mavenPublishing {
     // Define coordinates for the published artifact
@@ -44,7 +62,7 @@ mavenPublishing {
     pom {
         name.set("Soia Kotlin Client")
         description.set("Soia Client for the Kotlin Language")
-        inceptionYear.set("2024")
+        inceptionYear.set("2025")
         url.set("https://github.com/gepheum/soia-kotlin-client")
 
         licenses {
