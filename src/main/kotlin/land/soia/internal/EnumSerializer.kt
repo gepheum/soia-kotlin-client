@@ -139,7 +139,7 @@ class EnumSerializer<Enum : Any> private constructor(
             out: StringBuilder,
             eolIndent: String,
         ) {
-            val className = getClassNameWithoutPackage(input::class)
+            val className = getClassNameWithoutPackage(input::class)!!.substringBeforeLast(".")
             out.append(className).append(".UNKNOWN")
         }
     }
