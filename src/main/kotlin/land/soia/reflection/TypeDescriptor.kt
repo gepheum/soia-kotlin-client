@@ -137,7 +137,7 @@ interface RecordDescriptorBase<Field : FieldBase> : TypeDescriptorBase {
     fun getField(number: Int): Field?
 }
 
-fun <Field : FieldBase> RecordDescriptorBase<Field>.recordId(): String = "${this.modulePath}:${this.qualifiedName}"
+private fun <Field : FieldBase> RecordDescriptorBase<Field>.recordId(): String = "${this.modulePath}:${this.qualifiedName}"
 
 /**
  * Describes a record type (struct or enum).
