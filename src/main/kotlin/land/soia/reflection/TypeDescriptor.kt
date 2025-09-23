@@ -5,22 +5,17 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import land.soia.internal.RecordId
 
 interface TypeDescriptorBase
 
-/**
- * Describes a Soia type.
- */
+/** Describes a Soia type. */
 sealed interface TypeDescriptor : TypeDescriptorBase {
-    /**
-     * Adds runtime introspection capabilities to a [TypeDescriptor].
-     */
+    /** Adds runtime introspection capabilities to a [TypeDescriptor]. */
     sealed interface Reflective : TypeDescriptorBase
 }
 
-/**
- * Enumeration of all primitive types supported by Soia.
- */
+/** Enumeration of all primitive types supported by Soia. */
 enum class PrimitiveType {
     /** Boolean true/false values. */
     BOOL,
@@ -50,9 +45,7 @@ enum class PrimitiveType {
     BYTES,
 }
 
-/**
- * Describes a primitive type such as integers, strings, booleans, etc.
- */
+/** Describes a primitive type such as integers, strings, booleans, etc. */
 interface PrimitiveDescriptor : TypeDescriptor, TypeDescriptor.Reflective {
     /** The specific primitive type being described. */
     val primitiveType: PrimitiveType
@@ -71,11 +64,13 @@ interface OptionalDescriptorBase<OtherType : TypeDescriptorBase> : TypeDescripto
 /**
  * Describes an optional type that can hold either a value of the wrapped type or null.
  */
-interface OptionalDescriptor : TypeDescriptor, OptionalDescriptorBase<TypeDescriptor> {
-    interface Reflective : TypeDescriptor.Reflective, OptionalDescriptorBase<TypeDescriptor.Reflective>
+class OptionalDescriptor internal constructor(
+    override val otherType: TypeDescriptor,
+) : OptionalDescriptorBase<TypeDescriptor>, TypeDescriptor {
+    interface Reflective : OptionalDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
 }
 
-interface ListDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptor {
+interface ListDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptorBase {
     /** Describes the type of the array items. */
     val itemType: ItemType
 
@@ -86,7 +81,10 @@ interface ListDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptor {
 /**
  * Describes a list type containing elements of a specific type.
  */
-interface ListDescriptor : ListDescriptorBase<TypeDescriptor>, TypeDescriptor {
+class ListDescriptor internal constructor(
+    override val itemType: TypeDescriptor,
+    override val keyChain: String?,
+) : ListDescriptorBase<TypeDescriptor>, TypeDescriptor {
     interface Reflective : ListDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
 }
 
@@ -139,11 +137,29 @@ interface RecordDescriptorBase<Field : FieldBase> : TypeDescriptorBase {
     fun getField(number: Int): Field?
 }
 
+fun <Field : FieldBase> RecordDescriptorBase<Field>.recordId(): String = "${this.modulePath}:${this.qualifiedName}"
+
 /**
  * Describes a record type (struct or enum).
  */
-sealed interface RecordDescriptor<Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor {
-    interface Reflective<Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor.Reflective
+sealed class RecordDescriptor<Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor {
+    override fun getField(name: String): Field? {
+        return nameToField[name]
+    }
+
+    override fun getField(number: Int): Field? {
+        return numberToField[number]
+    }
+
+    private val nameToField by lazy {
+        fields.associateBy { it.name }
+    }
+
+    private val numberToField by lazy {
+        fields.associateBy { it.number }
+    }
+
+    sealed interface Reflective<Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor.Reflective
 }
 
 interface StructFieldBase<TypeDescriptor : TypeDescriptorBase> : FieldBase {
@@ -151,7 +167,11 @@ interface StructFieldBase<TypeDescriptor : TypeDescriptorBase> : FieldBase {
     val type: TypeDescriptor
 }
 
-interface StructField : StructFieldBase<TypeDescriptor> {
+class StructField internal constructor(
+    override val name: String,
+    override val number: Int,
+    override val type: TypeDescriptor,
+) : StructFieldBase<TypeDescriptor> {
     interface Reflective<Frozen, Mutable, Value> : StructFieldBase<TypeDescriptor.Reflective> {
         /** Extracts the value of the field from the given struct. */
         fun get(struct: Frozen): Value
@@ -169,7 +189,18 @@ interface StructDescriptorBase<Field : StructFieldBase<*>> : RecordDescriptorBas
 /**
  * Describes a Soia struct type with its fields and structure.
  */
-interface StructDescriptor : StructDescriptorBase<StructField>, RecordDescriptor<StructField> {
+class StructDescriptor internal constructor(
+    private val recordId: RecordId,
+    override val removedNumbers: Set<Int>,
+    fields: List<StructField> = listOf(),
+) : RecordDescriptor<StructField>(), StructDescriptorBase<StructField> {
+    override var fields: List<StructField> = fields
+        internal set
+
+    override val name: String get() = recordId.name
+    override val qualifiedName: String get() = recordId.qualifiedName
+    override val modulePath: String get() = recordId.modulePath
+
     interface Reflective<Frozen, Mutable> :
         StructDescriptorBase<StructField.Reflective<Frozen, Mutable, *>>,
         RecordDescriptor.Reflective<StructField.Reflective<Frozen, Mutable, *>> {
@@ -177,7 +208,7 @@ interface StructDescriptor : StructDescriptorBase<StructField>, RecordDescriptor
          * Returns a new instance of the generated mutable class for a struct.
          * Performs a shallow copy of `initializer` if `initializer` is specified.
          */
-        fun newMutable(initializer: Frozen?): Mutable
+        fun newMutable(initializer: Frozen? = null): Mutable
 
         /**
          * Converts a mutable struct instance to its frozen (immutable) form.
@@ -195,14 +226,17 @@ interface EnumConstantFieldBase : FieldBase
 /**
  * Describes an enum constant field (a field that represents a simple named value).
  */
-interface EnumConstantField : EnumConstantFieldBase, EnumField {
+class EnumConstantField internal constructor(
+    override val name: String,
+    override val number: Int,
+) : EnumConstantFieldBase, EnumField {
     interface Reflective<Enum> : EnumConstantFieldBase, EnumField.Reflective<Enum> {
         /** The constant value represented by this field. */
         val constant: Enum
     }
 }
 
-interface EnumValueFieldBase<TypeDescriptor : TypeDescriptorBase> : EnumField {
+interface EnumValueFieldBase<TypeDescriptor : TypeDescriptorBase> : FieldBase {
     /** The type of the value associated with this enum field. */
     val type: TypeDescriptor
 }
@@ -210,7 +244,11 @@ interface EnumValueFieldBase<TypeDescriptor : TypeDescriptorBase> : EnumField {
 /**
  * Describes an enum value field (a field that can hold additional data).
  */
-interface EnumValueField : EnumValueFieldBase<TypeDescriptor>, EnumField {
+class EnumValueField internal constructor(
+    override val name: String,
+    override val number: Int,
+    override val type: TypeDescriptor,
+) : EnumValueFieldBase<TypeDescriptor>, EnumField {
     /**
      * Reflective interface for enum value fields.
      *
@@ -235,12 +273,23 @@ interface EnumValueField : EnumValueFieldBase<TypeDescriptor>, EnumField {
     }
 }
 
-interface EnumDescriptorBase<Field : FieldBase> : RecordDescriptor<Field>
+interface EnumDescriptorBase<Field : FieldBase> : RecordDescriptorBase<Field>
 
 /**
  * Describes a Soia enum type with its possible values and associated data.
  */
-interface EnumDescriptor : EnumDescriptorBase<EnumField>, RecordDescriptor<EnumField> {
+class EnumDescriptor internal constructor(
+    private val recordId: RecordId,
+    override val removedNumbers: Set<Int>,
+    fields: List<EnumField> = listOf(),
+) : RecordDescriptor<EnumField>(), EnumDescriptorBase<EnumField> {
+    override var fields: List<EnumField> = fields
+        internal set
+
+    override val name: String get() = recordId.name
+    override val qualifiedName: String get() = recordId.qualifiedName
+    override val modulePath: String get() = recordId.modulePath
+
     /**
      * Reflective interface for enum descriptors.
      *
@@ -252,13 +301,68 @@ interface EnumDescriptor : EnumDescriptorBase<EnumField>, RecordDescriptor<EnumF
     }
 }
 
+fun TypeDescriptor.Reflective.notReflective(): TypeDescriptor {
+    return when (this) {
+        is PrimitiveDescriptor -> this
+        is OptionalDescriptor.Reflective ->
+            OptionalDescriptor(
+                otherType = this.otherType.notReflective(),
+            )
+        is ListDescriptor.Reflective ->
+            ListDescriptor(
+                itemType = this.itemType.notReflective(),
+                keyChain = this.keyChain,
+            )
+        is StructDescriptor.Reflective<*, *> ->
+            StructDescriptor(
+                recordId = RecordId.parse(this.recordId()),
+                fields =
+                    this.fields.map {
+                        StructField(
+                            name = it.name,
+                            number = it.number,
+                            type = it.type.notReflective(),
+                        )
+                    },
+                removedNumbers = this.removedNumbers,
+            )
+        is EnumDescriptor.Reflective<*> ->
+            EnumDescriptor(
+                recordId = RecordId.parse(this.recordId()),
+                fields =
+                    this.fields.map {
+                        if (it is EnumValueField.Reflective<*, *>) {
+                            EnumValueField(
+                                name = it.name,
+                                number = it.number,
+                                type = it.type.notReflective(),
+                            )
+                        } else {
+                            EnumConstantField(
+                                name = it.name,
+                                number = it.number,
+                            )
+                        }
+                    },
+                removedNumbers = this.removedNumbers,
+            )
+    }
+}
+
 /**
  * Converts this type descriptor to its JSON representation.
  *
  * @return A JsonObject containing the complete type information
  */
 fun TypeDescriptor.asJson(): JsonObject {
-    return asJsonImpl(this)
+    val recordIdToDefinition = mutableMapOf<String, JsonObject>()
+    addRecordDefinitions(this, recordIdToDefinition)
+    return JsonObject(
+        mapOf(
+            "records" to JsonArray(recordIdToDefinition.values.toList()),
+            "type" to getTypeSignature(this),
+        ),
+    )
 }
 
 /**
@@ -276,7 +380,7 @@ fun TypeDescriptor.asJsonCode(): String {
  * @return A JsonObject containing the complete type information
  */
 fun TypeDescriptor.Reflective.asJson(): JsonObject {
-    return asJsonImpl(this)
+    return this.notReflective().asJson()
 }
 
 /**
@@ -285,7 +389,7 @@ fun TypeDescriptor.Reflective.asJson(): JsonObject {
  * @return A pretty-printed JSON string describing the type
  */
 fun TypeDescriptor.Reflective.asJsonCode(): String {
-    return readableJson.encodeToString(JsonElement.serializer(), asJson())
+    return this.notReflective().asJsonCode()
 }
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
@@ -295,18 +399,7 @@ private val readableJson =
         prettyPrintIndent = "  "
     }
 
-private fun asJsonImpl(typeDescriptor: TypeDescriptorBase): JsonObject {
-    val recordIdToDefinition = mutableMapOf<String, JsonObject>()
-    addRecordDefinitions(typeDescriptor, recordIdToDefinition)
-    return JsonObject(
-        mapOf(
-            "records" to JsonArray(recordIdToDefinition.values.toList()),
-            "type" to getTypeSignature(typeDescriptor),
-        ),
-    )
-}
-
-private fun getTypeSignature(typeDescriptor: TypeDescriptorBase): JsonObject {
+private fun getTypeSignature(typeDescriptor: TypeDescriptor): JsonObject {
     return when (typeDescriptor) {
         is PrimitiveDescriptor ->
             JsonObject(
@@ -328,14 +421,14 @@ private fun getTypeSignature(typeDescriptor: TypeDescriptorBase): JsonObject {
                         ),
                 ),
             )
-        is OptionalDescriptorBase<*> ->
+        is OptionalDescriptor ->
             JsonObject(
                 mapOf(
                     "kind" to JsonPrimitive("optional"),
                     "value" to getTypeSignature(typeDescriptor.otherType),
                 ),
             )
-        is ListDescriptorBase<*> ->
+        is ListDescriptor ->
             JsonObject(
                 mapOf(
                     "kind" to JsonPrimitive("array"),
@@ -354,14 +447,13 @@ private fun getTypeSignature(typeDescriptor: TypeDescriptorBase): JsonObject {
                         ),
                 ),
             )
-        is RecordDescriptorBase<*> ->
+        is RecordDescriptor<*> ->
             JsonObject(
                 mapOf(
                     "kind" to JsonPrimitive("record"),
                     "value" to JsonPrimitive("${typeDescriptor.modulePath}:${typeDescriptor.qualifiedName}"),
                 ),
             )
-        else -> throw AssertionError("unreachable")
     }
 }
 
@@ -371,18 +463,40 @@ private fun addRecordDefinitions(
 ) {
     when (typeDescriptor) {
         is PrimitiveDescriptor -> {}
-        is OptionalDescriptorBase<*> -> addRecordDefinitions(typeDescriptor.otherType, recordIdToDefinition)
-        is ListDescriptorBase<*> -> addRecordDefinitions(typeDescriptor.itemType, recordIdToDefinition)
-        is RecordDescriptorBase<*> -> {
-            val recordId = "${typeDescriptor.modulePath}:${typeDescriptor.qualifiedName}"
-            if (recordId !in recordIdToDefinition) {
-                val kind: String
-                val fields: List<JsonObject>
-                val dependencies: List<TypeDescriptorBase>
-                if (typeDescriptor is StructDescriptorBase<*>) {
-                    kind = "struct"
-                    fields =
-                        typeDescriptor.fields.map {
+        is OptionalDescriptor -> addRecordDefinitions(typeDescriptor.otherType, recordIdToDefinition)
+        is ListDescriptor -> addRecordDefinitions(typeDescriptor.itemType, recordIdToDefinition)
+        is StructDescriptor -> {
+            val recordId = typeDescriptor.recordId()
+            val fields =
+                typeDescriptor.fields.map {
+                    JsonObject(
+                        mapOf(
+                            "name" to JsonPrimitive(it.name),
+                            "number" to JsonPrimitive(it.number),
+                            "type" to getTypeSignature(it.type),
+                        ),
+                    )
+                }
+            recordIdToDefinition[recordId] =
+                JsonObject(
+                    mapOf(
+                        "kind" to JsonPrimitive("struct"),
+                        "id" to JsonPrimitive(recordId),
+                        "fields" to JsonArray(fields),
+                        "removed_fields" to JsonArray(typeDescriptor.removedNumbers.map { JsonPrimitive(it) }),
+                    ),
+                )
+            val dependencies = typeDescriptor.fields.map { it.type }
+            for (dependency in dependencies) {
+                addRecordDefinitions(dependency, recordIdToDefinition)
+            }
+        }
+        is EnumDescriptor -> {
+            val recordId = typeDescriptor.recordId()
+            val fields =
+                typeDescriptor.fields.map {
+                    when (it) {
+                        is EnumValueField ->
                             JsonObject(
                                 mapOf(
                                     "name" to JsonPrimitive(it.name),
@@ -390,45 +504,27 @@ private fun addRecordDefinitions(
                                     "type" to getTypeSignature(it.type),
                                 ),
                             )
-                        }
-                    dependencies = typeDescriptor.fields.map { it.type }
-                } else {
-                    kind = "enum"
-                    fields =
-                        typeDescriptor.fields.map {
-                            when (it) {
-                                is EnumConstantFieldBase ->
-                                    JsonObject(
-                                        mapOf(
-                                            "name" to JsonPrimitive(it.name),
-                                            "number" to JsonPrimitive(it.number),
-                                        ),
-                                    )
-                                is EnumValueFieldBase<*> ->
-                                    JsonObject(
-                                        mapOf(
-                                            "name" to JsonPrimitive(it.name),
-                                            "number" to JsonPrimitive(it.number),
-                                            "type" to getTypeSignature(it.type),
-                                        ),
-                                    )
-                                else -> throw AssertionError("unreachable")
-                            }
-                        }
-                    dependencies = typeDescriptor.fields.mapNotNull { (it as? EnumValueField)?.type }
+                        is EnumConstantField ->
+                            JsonObject(
+                                mapOf(
+                                    "name" to JsonPrimitive(it.name),
+                                    "number" to JsonPrimitive(it.number),
+                                ),
+                            )
+                    }
                 }
-                recordIdToDefinition[recordId] =
-                    JsonObject(
-                        mapOf(
-                            "kind" to JsonPrimitive(kind),
-                            "id" to JsonPrimitive(recordId),
-                            "fields" to JsonArray(fields),
-                            "removed_fields" to JsonArray(typeDescriptor.removedNumbers.map { JsonPrimitive(it) }),
-                        ),
-                    )
-                for (dependency in dependencies) {
-                    addRecordDefinitions(dependency, recordIdToDefinition)
-                }
+            recordIdToDefinition[recordId] =
+                JsonObject(
+                    mapOf(
+                        "kind" to JsonPrimitive("enum"),
+                        "id" to JsonPrimitive(recordId),
+                        "fields" to JsonArray(fields),
+                        "removed_fields" to JsonArray(typeDescriptor.removedNumbers.map { JsonPrimitive(it) }),
+                    ),
+                )
+            val dependencies = typeDescriptor.fields.mapNotNull { (it as? EnumValueField)?.type }
+            for (dependency in dependencies) {
+                addRecordDefinitions(dependency, recordIdToDefinition)
             }
         }
     }

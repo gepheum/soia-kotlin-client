@@ -4,6 +4,15 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import land.soia.internal.toStringImpl
+import land.soia.reflection.EnumDescriptor
+import land.soia.reflection.ListDescriptor
+import land.soia.reflection.OptionalDescriptor
+import land.soia.reflection.PrimitiveDescriptor
+import land.soia.reflection.RecordDescriptor
+import land.soia.reflection.StructDescriptor
+import land.soia.reflection.asJson
+import land.soia.reflection.asJsonCode
+import land.soia.reflection.parseTypeDescriptor
 import okio.ByteString
 import okio.ByteString.Companion.decodeHex
 import okio.ByteString.Companion.encodeUtf8
@@ -1323,5 +1332,35 @@ class SerializersTest {
     fun `test toStringImpl - optional`() {
         assertThat(toStringImpl(null, Serializers.optional(Serializers.bool).impl)).isEqualTo("null")
         assertThat(toStringImpl(true, Serializers.optional(Serializers.bool).impl)).isEqualTo("true")
+    }
+
+    @Test
+    fun `test TypeDescriptor type hierarchy`() {
+        when (Serializers.bool.typeDescriptor) {
+            is PrimitiveDescriptor -> {}
+            is OptionalDescriptor.Reflective -> {}
+            is ListDescriptor.Reflective -> {}
+            is RecordDescriptor.Reflective<*> -> {}
+        }
+        when (Serializers.bool.typeDescriptor) {
+            is PrimitiveDescriptor -> {}
+            is OptionalDescriptor.Reflective -> {}
+            is ListDescriptor.Reflective -> {}
+            is StructDescriptor.Reflective<*, *> -> {}
+            is EnumDescriptor.Reflective<*> -> {}
+        }
+        when (parseTypeDescriptor(Serializers.bool.typeDescriptor.asJson())) {
+            is PrimitiveDescriptor -> {}
+            is OptionalDescriptor -> {}
+            is ListDescriptor -> {}
+            is RecordDescriptor<*> -> {}
+        }
+        when (parseTypeDescriptor(Serializers.bool.typeDescriptor.asJsonCode())) {
+            is PrimitiveDescriptor -> {}
+            is OptionalDescriptor -> {}
+            is ListDescriptor -> {}
+            is StructDescriptor -> {}
+            is EnumDescriptor -> {}
+        }
     }
 }
