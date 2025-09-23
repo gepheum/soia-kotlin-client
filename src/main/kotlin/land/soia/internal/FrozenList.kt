@@ -83,12 +83,12 @@ private open class KeyedListImpl<E, K>(
     val getKeySpec: String,
     val getKey: (E) -> K,
 ) : FrozenList<E>(list), KeyedList<E, K> {
-    override val indexing: Map<K, E> by lazy {
+    override val mapView: Map<K, E> by lazy {
         list.associateBy(getKey)
     }
 }
 
 private object FrozenEmptyList : FrozenList<Any>(emptyList()), KeyedList<Any, Any> {
-    override val indexing: Map<Any, Any>
+    override val mapView: Map<Any, Any>
         get() = emptyMap()
 }
