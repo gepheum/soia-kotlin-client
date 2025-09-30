@@ -15,7 +15,7 @@ package land.soia
  */
 class Method<Request, Response>(
     val name: String,
-    number: Int,
-    requestSerializer: Serializer<Request>,
-    responseSerializer: Serializer<Response>,
+    val number: Int,
+    val requestSerializer: Serializer<Request>,
+    val responseSerializer: Serializer<Response>,
 )

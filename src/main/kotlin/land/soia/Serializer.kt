@@ -31,6 +31,7 @@ class Serializer<T> internal constructor(
      */
     fun toJson(
         input: T,
+        @Suppress("UNUSED_PARAMETER")
         mustNameArguments: MustNameArguments = MustNameArguments,
         readableFlavor: Boolean = false,
     ): JsonElement {
@@ -49,6 +50,7 @@ class Serializer<T> internal constructor(
      */
     fun toJsonCode(
         input: T,
+        @Suppress("UNUSED_PARAMETER")
         mustNameArguments: MustNameArguments = MustNameArguments,
         readableFlavor: Boolean = false,
     ): String {
@@ -64,14 +66,11 @@ class Serializer<T> internal constructor(
      * Deserializes an object from its JSON representation.
      *
      * @param json The JSON element to deserialize
-     * @param readableFlavor Whether to produce a more human-readable and less compact
-     *     JSON representation. Not suitable for persistencence: renaming fields in
-     *     the '.soia' file, which is allowed by design, will break backward
-     *     compatibility.
      * @return The deserialized object
      */
     fun fromJson(
         json: JsonElement,
+        @Suppress("UNUSED_PARAMETER")
         mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
@@ -82,14 +81,11 @@ class Serializer<T> internal constructor(
      * Deserializes an object from its JSON string representation.
      *
      * @param jsonCode The JSON string to deserialize
-     * @param readableFlavor Whether to produce a more human-readable and less compact
-     *     JSON representation. Not suitable for persistencence: renaming fields in
-     *     the '.soia' file, which is allowed by design, will break backward
-     *     compatibility.
      * @return The deserialized object
      */
     fun fromJsonCode(
         jsonCode: String,
+        @Suppress("UNUSED_PARAMETER")
         mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
@@ -117,14 +113,11 @@ class Serializer<T> internal constructor(
      * Deserializes an object from its binary representation.
      *
      * @param bytes The byte array containing the serialized data
-     * @param readableFlavor Whether to produce a more human-readable and less compact
-     *     JSON representation. Not suitable for persistencence: renaming fields in
-     *     the '.soia' file, which is allowed by design, will break backward
-     *     compatibility.
      * @return The deserialized object
      */
     fun fromBytes(
         bytes: ByteArray,
+        @Suppress("UNUSED_PARAMETER")
         mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
@@ -137,14 +130,11 @@ class Serializer<T> internal constructor(
      * Deserializes an object from its binary representation.
      *
      * @param bytes The ByteString containing the serialized data
-     * @param readableFlavor Whether to produce a more human-readable and less compact
-     *     JSON representation. Not suitable for persistencence: renaming fields in
-     *     the '.soia' file, which is allowed by design, will break backward
-     *     compatibility.
      * @return The deserialized object
      */
     fun fromBytes(
         bytes: ByteString,
+        @Suppress("UNUSED_PARAMETER")
         mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
@@ -155,6 +145,8 @@ class Serializer<T> internal constructor(
 
     private fun fromBytes(
         buffer: Buffer,
+        @Suppress("UNUSED_PARAMETER")
+        mustNameArguments: MustNameArguments = MustNameArguments,
         keepUnrecognizedFields: Boolean = false,
     ): T {
         return if (buffer.readByte().toInt() == 's'.code &&
