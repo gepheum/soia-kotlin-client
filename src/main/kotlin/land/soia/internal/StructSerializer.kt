@@ -110,13 +110,13 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
         checkNotFinalized()
         finalized = true
         mutableFields.sortBy { it.number }
-        val numSlots = if (mutableFields.isNotEmpty()) mutableFields.last().number + 1 else 0
-        slotToField = arrayOfNulls(numSlots)
+        val slotCountNoRemoved = if (mutableFields.isNotEmpty()) mutableFields.last().number + 1 else 0
+        slotCountInclRemoved = (slotCountNoRemoved).coerceAtLeast(maxRemovedNumber + 1)
+        slotToField = arrayOfNulls(slotCountInclRemoved)
         for (field in mutableFields) {
             slotToField[field.number] = field
         }
-        zeros = List(numSlots) { JSON_ZERO }
-        recognizedSlotCount = (numSlots - 1).coerceAtLeast(maxRemovedNumber) + 1
+        zeros = List(slotCountInclRemoved) { JSON_ZERO }
     }
 
     private fun checkNotFinalized() {
@@ -130,10 +130,14 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
     private val mutableRemovedNumbers = mutableSetOf<Int>()
     private var maxRemovedNumber = -1
     private val nameToField = mutableMapOf<String, Field<Frozen, Mutable, *>>()
+    // Includes removed numbers
+    private var slotCountInclRemoved = 0
+    // Length: `slotCountInclRemoved`
+    // Removed numbers are represented as null elements.
     private var slotToField = arrayOf<Field<Frozen, Mutable, *>?>()
-    private var recognizedSlotCount = 0
 
     // One zero for each slot
+    // Length: `slotCountInclRemoved`
     private var zeros: List<JsonPrimitive> = listOf()
     private var finalized = false
 
@@ -219,18 +223,18 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
     ): Frozen {
         val mutable = newMutableFn(null)
         val numSlotsToFill: Int
-        if (jsonArray.size > recognizedSlotCount) {
+        if (jsonArray.size > slotCountInclRemoved) {
             // We have some unrecognized fields.
             if (keepUnrecognizedFields) {
                 val unrecognizedFields =
                     UnrecognizedFields<Frozen>(
                         jsonArray.size,
-                        jsonArray.subList(fromIndex = recognizedSlotCount, toIndex = jsonArray.size)
+                        jsonArray.subList(fromIndex = slotCountInclRemoved, toIndex = jsonArray.size)
                             .map { copyJson(it) }.toList(),
                     )
                 setUnrecognizedFields(mutable, unrecognizedFields)
             }
-            numSlotsToFill = recognizedSlotCount
+            numSlotsToFill = slotCountInclRemoved
         } else {
             numSlotsToFill = jsonArray.size
         }
@@ -262,7 +266,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
         val unrecognizedFields = getUnrecognizedFields(input)
         if (unrecognizedFields?.bytes != null) {
             totalSlotCount = unrecognizedFields.totalSlotCount
-            recognizedSlotCount = this.recognizedSlotCount
+            recognizedSlotCount = this.slotCountInclRemoved
             unrecognizedBytes = unrecognizedFields.bytes
         } else {
             // No unrecognized fields.
@@ -308,7 +312,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
                 wire - 246
             }
         // Do not read more slots than the number of recognized slots.
-        for (i in 0 until encodedSlotCount.coerceAtMost(recognizedSlotCount)) {
+        for (i in 0 until encodedSlotCount.coerceAtMost(slotCountInclRemoved)) {
             val field = slotToField[i]
             if (field != null) {
                 field.decodeValue(mutable, buffer, keepUnrecognizedFields = keepUnrecognizedFields)
@@ -317,11 +321,11 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
                 decodeUnused(buffer)
             }
         }
-        if (encodedSlotCount > recognizedSlotCount) {
+        if (encodedSlotCount > slotCountInclRemoved) {
             // We have some unrecognized fields.
             if (keepUnrecognizedFields) {
                 val peekBuffer = CountingSource(buffer.peek())
-                for (i in recognizedSlotCount until encodedSlotCount) {
+                for (i in slotCountInclRemoved until encodedSlotCount) {
                     decodeUnused(peekBuffer.buffer)
                 }
                 val unrecognizedByteCount = peekBuffer.bytesRead
@@ -333,7 +337,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
                     )
                 setUnrecognizedFields(mutable, unrecognizedFields)
             } else {
-                for (i in recognizedSlotCount until encodedSlotCount) {
+                for (i in slotCountInclRemoved until encodedSlotCount) {
                     decodeUnused(buffer)
                 }
             }
