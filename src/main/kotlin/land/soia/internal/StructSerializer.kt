@@ -130,8 +130,10 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
     private val mutableRemovedNumbers = mutableSetOf<Int>()
     private var maxRemovedNumber = -1
     private val nameToField = mutableMapOf<String, Field<Frozen, Mutable, *>>()
+
     // Includes removed numbers
     private var slotCountInclRemoved = 0
+
     // Length: `slotCountInclRemoved`
     // Removed numbers are represented as null elements.
     private var slotToField = arrayOf<Field<Frozen, Mutable, *>?>()
