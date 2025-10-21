@@ -342,7 +342,7 @@ class EnumSerializer<Enum : Any> private constructor(
                         ValueField.wrapFromJson(field, second)
                     }
                     null ->
-                        if (number != null) {
+                        if (keepUnrecognizedFields && number != null) {
                             unknown.wrapUnrecognized(UnrecognizedEnum(json))
                         } else {
                             unknown.constant
