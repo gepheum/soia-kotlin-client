@@ -393,7 +393,7 @@ class EnumSerializer<Enum : Any> private constructor(
             resultOrNull =
                 when (val field = numberToField[number]) {
                     is RemovedNumber -> {
-                        decodeUnused(peekBuffer.buffer);
+                        decodeUnused(peekBuffer.buffer)
                         unknown.constant
                     }
                     is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
@@ -404,7 +404,7 @@ class EnumSerializer<Enum : Any> private constructor(
                             keepUnrecognizedFields = keepUnrecognizedFields,
                         )
                     null -> {
-                        decodeUnused(peekBuffer.buffer);
+                        decodeUnused(peekBuffer.buffer)
                         null
                     }
                 }
