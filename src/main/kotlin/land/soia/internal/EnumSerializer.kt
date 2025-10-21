@@ -392,7 +392,10 @@ class EnumSerializer<Enum : Any> private constructor(
             val number = if (wire == 248) decodeNumber(peekBuffer.buffer).toInt() else wire - 250
             resultOrNull =
                 when (val field = numberToField[number]) {
-                    is RemovedNumber -> unknown.constant
+                    is RemovedNumber -> {
+                        decodeUnused(peekBuffer.buffer);
+                        unknown.constant
+                    }
                     is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
                     is ValueField<Enum, *> ->
                         ValueField.wrapDecoded(
@@ -400,7 +403,10 @@ class EnumSerializer<Enum : Any> private constructor(
                             peekBuffer.buffer,
                             keepUnrecognizedFields = keepUnrecognizedFields,
                         )
-                    null -> null
+                    null -> {
+                        decodeUnused(peekBuffer.buffer);
+                        null
+                    }
                 }
         }
         val byteCount = peekBuffer.bytesRead
@@ -410,12 +416,12 @@ class EnumSerializer<Enum : Any> private constructor(
                 val bytes = buffer.readByteString(byteCount)
                 result = unknown.wrapUnrecognized(UnrecognizedEnum(bytes))
             } else {
-                result = unknown.constant
                 buffer.skip(byteCount)
+                result = unknown.constant
             }
         } else {
-            result = resultOrNull
             buffer.skip(byteCount)
+            result = resultOrNull
         }
         return result
     }

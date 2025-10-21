@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "land.soia"
-version = "1.0.21"
+version = "1.0.22"
 
 kotlin {
     compilerOptions {
@@ -56,7 +56,7 @@ mavenPublishing {
     coordinates(
         groupId = "land.soia",
         artifactId = "soia-kotlin-client",
-        version = "1.0.21",
+        version = "1.0.22",
     )
 
     // Configure POM metadata for the published artifact

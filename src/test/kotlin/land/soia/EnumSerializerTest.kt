@@ -10,6 +10,7 @@ import land.soia.internal.toStringImpl
 import land.soia.reflection.asJson
 import land.soia.reflection.asJsonCode
 import land.soia.reflection.parseTypeDescriptor
+import okio.ByteString
 import org.junit.jupiter.api.Test
 
 class EnumSerializerTest {
@@ -217,7 +218,7 @@ class EnumSerializerTest {
     }
 
     @Test
-    fun `test enum serializer - unknown values with keeping unrecognized`() {
+    fun `test enum serializer - unknown values with keep unrecognized - JSON`() {
         // Test unknown constant number with keepUnrecognizedFields = true
         val unknownConstant = colorEnumSerializer.fromJson(JsonPrimitive(99), keepUnrecognizedFields = true)
         assertThat(unknownConstant).isInstanceOf(Color.Unknown::class.java)
@@ -230,6 +231,21 @@ class EnumSerializerTest {
         assertThat(unknownValue).isInstanceOf(Color.Unknown::class.java)
         val unknownValueEnum = (unknownValue as Color.Unknown).unrecognized
         assertThat(unknownValueEnum?.jsonElement).isEqualTo(unknownValueJson)
+    }
+
+    @Test
+    fun `test enum serializer - unknown values with keep unrecognized - binary`() {
+        // Test unknown constant number with keepUnrecognizedFields = true
+        val serializer = Serializer(colorEnumSerializer)
+        val unknownConstant = serializer.fromBytes(byteArrayOf(115, 111, 105, 97, 10), keepUnrecognizedFields = true)
+        assertThat(unknownConstant).isInstanceOf(Color.Unknown::class.java)
+        val unknownEnum = (unknownConstant as Color.Unknown).unrecognized
+        assertThat(unknownEnum?.bytes).isEqualTo(ByteString.of(10))
+
+        val unknownValue = serializer.fromBytes(byteArrayOf(115, 111, 105, 97, -8, 10, 11), keepUnrecognizedFields = true)
+        assertThat(unknownValue).isInstanceOf(Color.Unknown::class.java)
+        val unknownValueEnum = (unknownValue as Color.Unknown).unrecognized
+        assertThat(unknownValueEnum?.bytes).isEqualTo(ByteString.of(-8, 10, 11))
     }
 
     @Test
