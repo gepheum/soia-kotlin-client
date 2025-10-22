@@ -373,57 +373,59 @@ class EnumSerializer<Enum : Any> private constructor(
         buffer: BufferedSource,
         keepUnrecognizedFields: Boolean,
     ): Enum {
-        var peekBuffer = CountingSource(buffer.peek())
-        val wire = peekBuffer.buffer.readByte().toInt() and 0xFF
-        val resultOrNull: Enum?
+        val wire = buffer.buffer.readByte().toInt() and 0xFF
         if (wire < 242) {
             // A number: rewind
-            peekBuffer = CountingSource(buffer.peek())
-            val number = decodeNumber(peekBuffer.buffer).toInt()
-            resultOrNull =
-                when (val field = numberToField[number]) {
-                    is RemovedNumber -> unknown.constant
-                    is UnknownField -> unknown.constant
-                    is ConstantField<Enum, *> -> field.constant
-                    is ValueField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a value field")
-                    null -> null
-                }
-        } else {
-            val number = if (wire == 248) decodeNumber(peekBuffer.buffer).toInt() else wire - 250
-            resultOrNull =
-                when (val field = numberToField[number]) {
-                    is RemovedNumber -> {
-                        decodeUnused(peekBuffer.buffer)
+            val number = decodeNumberPastWire(buffer, wire).toInt()
+            return when (val field = numberToField[number]) {
+                is RemovedNumber -> unknown.constant
+                is UnknownField -> unknown.constant
+                is ConstantField<Enum, *> -> field.constant
+                is ValueField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a value field")
+                null -> {
+                    if (keepUnrecognizedFields) {
+                        val bytes = Buffer()
+                        encodeInt32(number, bytes)
+                        unknown.wrapUnrecognized(UnrecognizedEnum(bytes.readByteString()))
+                    } else {
                         unknown.constant
                     }
-                    is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
-                    is ValueField<Enum, *> ->
-                        ValueField.wrapDecoded(
-                            field,
-                            peekBuffer.buffer,
-                            keepUnrecognizedFields = keepUnrecognizedFields,
-                        )
-                    null -> {
-                        decodeUnused(peekBuffer.buffer)
-                        null
-                    }
                 }
-        }
-        val byteCount = peekBuffer.bytesRead
-        val result: Enum
-        if (resultOrNull == null) {
-            if (keepUnrecognizedFields) {
-                val bytes = buffer.readByteString(byteCount)
-                result = unknown.wrapUnrecognized(UnrecognizedEnum(bytes))
-            } else {
-                buffer.skip(byteCount)
-                result = unknown.constant
             }
         } else {
-            buffer.skip(byteCount)
-            result = resultOrNull
+            val number = if (wire == 248) decodeNumber(buffer).toInt() else wire - 250
+            return when (val field = numberToField[number]) {
+                is RemovedNumber -> {
+                    decodeUnused(buffer)
+                    unknown.constant
+                }
+                is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
+                is ValueField<Enum, *> ->
+                    ValueField.wrapDecoded(
+                        field,
+                        buffer,
+                        keepUnrecognizedFields = keepUnrecognizedFields,
+                    )
+                null -> {
+                    if (keepUnrecognizedFields) {
+                        val unrecognizedBytes = okio.Buffer()
+                        if (number in 1..4) {
+                            unrecognizedBytes.writeByte(wire + 250)
+                        } else {
+                            unrecognizedBytes.writeByte(248)
+                            encodeInt32(number, unrecognizedBytes)
+                        }
+                        val peekBuffer = buffer.peek()
+                        val byteCount = decodeUnused(peekBuffer)
+                        unrecognizedBytes.write(buffer.readByteString(byteCount))
+                        unknown.wrapUnrecognized(UnrecognizedEnum(unrecognizedBytes.readByteString()))
+                    } else {
+                        decodeUnused(buffer)
+                        unknown.constant
+                    }
+                }
+            }
         }
-        return result
     }
 
     override fun appendString(

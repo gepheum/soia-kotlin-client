@@ -2,9 +2,6 @@ package land.soia.internal
 
 import okio.Buffer
 import okio.BufferedSource
-import okio.ForwardingSource
-import okio.Source
-import okio.buffer
 
 fun encodeInt32(
     input: Int,
@@ -65,7 +62,15 @@ fun encodeLengthPrefix(
 }
 
 fun decodeNumber(buffer: BufferedSource): Number {
-    return when (val wire = buffer.readByte().toInt() and 0xFF) {
+    val wire = buffer.readByte().toInt() and 0xFF
+    return decodeNumberPastWire(buffer, wire)
+}
+
+fun decodeNumberPastWire(
+    buffer: BufferedSource,
+    wire: Int,
+): Number {
+    return when (wire) {
         in 0..231 -> wire
         232 -> buffer.readShortLe().toInt() and 0xFFFF // uint16
         233 -> buffer.readIntLe().toLong() and 0xFFFFFFFF // uint32
@@ -73,72 +78,79 @@ fun decodeNumber(buffer: BufferedSource): Number {
         235 -> (buffer.readByte().toInt() and 0xFF) - 256L
         236 -> (buffer.readShortLe().toInt() and 0xFFFF) - 65536L
         237 -> buffer.readIntLe()
-        238 -> buffer.readLongLe()
-        239 -> buffer.readLongLe()
+        238, 239 -> buffer.readLongLe()
         240 -> Float.fromBits(buffer.readIntLe())
         241 -> Double.fromBits(buffer.readLongLe())
         else -> throw IllegalArgumentException("Expected: number; wire: $wire")
     }
 }
 
-fun decodeUnused(buffer: BufferedSource) {
+fun decodeNumberAndCountBytes(buffer: BufferedSource): Pair<Number, Int> {
+    return when (val wire = buffer.readByte().toInt() and 0xFF) {
+        in 0..231 -> Pair(wire, 1)
+        232 -> Pair(buffer.readShortLe().toInt() and 0xFFFF, 3) // uint16
+        233 -> Pair(buffer.readIntLe().toLong() and 0xFFFFFFFF, 5) // uint32
+        234 -> Pair(buffer.readLongLe(), 9) // uint64
+        235 -> Pair((buffer.readByte().toInt() and 0xFF) - 256L, 2)
+        236 -> Pair((buffer.readShortLe().toInt() and 0xFFFF) - 65536L, 3)
+        237 -> Pair(buffer.readIntLe(), 5)
+        238, 239 -> Pair(buffer.readLongLe(), 9)
+        240 -> Pair(Float.fromBits(buffer.readIntLe()), 5)
+        241 -> Pair(Double.fromBits(buffer.readLongLe()), 9)
+        else -> throw IllegalArgumentException("Expected: number; wire: $wire")
+    }
+}
+
+fun decodeUnused(buffer: BufferedSource): Long {
     val wire = buffer.readByte().toInt() and 0xFF
     if (wire < 232) {
-        return
+        return 1
     }
 
     when (wire - 232) {
         0, 4 -> { // uint16, uint16 - 65536
             buffer.skip(2)
+            return 3
         }
         1, 5, 8 -> { // uint32, int32, float32
             buffer.skip(4)
+            return 5
         }
         2, 6, 7, 9 -> { // uint64, int64, uint64 timestamp, float64
             buffer.skip(8)
+            return 9
         }
         3 -> { // uint8 - 256
             buffer.skip(1)
+            return 2
         }
         11, 13 -> { // string, bytes
-            val length = decodeNumber(buffer)
-            buffer.skip(length.toLong())
+            val (length, lengthByteCount) = decodeNumberAndCountBytes(buffer)
+            val lengthLong = length.toLong()
+            buffer.skip(lengthLong)
+            return 1 + lengthByteCount + lengthLong
         }
         15, 19, 20, 21, 22 -> { // array length==1, enum value kind==1-4
-            decodeUnused(buffer)
+            return 1 + decodeUnused(buffer)
         }
         16 -> { // array length==2
-            decodeUnused(buffer)
-            decodeUnused(buffer)
+            return 1 + decodeUnused(buffer) + decodeUnused(buffer)
         }
         17 -> { // array length==3
-            decodeUnused(buffer)
-            decodeUnused(buffer)
-            decodeUnused(buffer)
+            return 1 + decodeUnused(buffer) + decodeUnused(buffer) + decodeUnused(buffer)
         }
         18 -> { // array length==N
-            val length = decodeNumber(buffer)
-            repeat(length.toInt()) {
-                decodeUnused(buffer)
+            val (length, lengthByteCount) = decodeNumberAndCountBytes(buffer)
+            val lengthLong = length.toLong()
+            var result = 1L + lengthByteCount
+            for (i in 0L until lengthLong) {
+                result += decodeUnused(buffer)
             }
+            return result
+        }
+        else -> {
+            // 10, 12
+            return 1
         }
     }
-}
-
-class CountingSource(delegate: Source) : ForwardingSource(delegate) {
-    var bytesRead = 0L
-        private set
-
-    override fun read(
-        sink: Buffer,
-        byteCount: Long,
-    ): Long {
-        val result = super.read(sink, byteCount)
-        if (result != -1L) {
-            bytesRead += result
-        }
-        return result
-    }
-
-    val buffer = buffer()
 }

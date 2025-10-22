@@ -249,6 +249,18 @@ class EnumSerializerTest {
     }
 
     @Test
+    fun `test enum serializer - list of enums`() {
+        // Test unknown constant number with keepUnrecognizedFields = true
+        val serializer = Serializers.list(Serializer(colorEnumSerializer))
+        val list = listOf(Color.RED, Color.GREEN, Color.CustomOption(100))
+        assertThat(
+            serializer.fromBytes(
+                serializer.toBytes(list).toByteArray(),
+            ),
+        ).isEqualTo(list)
+    }
+
+    @Test
     fun `test enum serializer - removed fields`() {
         // Test accessing a removed field (should return unknown)
         val removedField = statusEnumSerializer.fromJson(JsonPrimitive(4), keepUnrecognizedFields = false)
