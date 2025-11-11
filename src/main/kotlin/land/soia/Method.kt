@@ -1,10 +1,7 @@
 package land.soia
 
 /**
- * Represents a method in a Soia service, encapsulating the request and response types along with metadata.
- *
- * A method defines a specific operation that can be performed by a service, including the types
- * of data it accepts as input and returns as output.
+ * Identifies one method in a Soia service, both on the server side and the client side.
  *
  * @param Request The type of the request parameter
  * @param Response The type of the response returned by this method

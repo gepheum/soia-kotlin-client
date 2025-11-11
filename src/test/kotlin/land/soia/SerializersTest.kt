@@ -233,14 +233,15 @@ class SerializersTest {
             )
 
         for (value in values) {
-            // Test DENSE flavor
+            // Test DENSE flavor (should use base64)
             val denseJson = Serializers.bytes.toJsonCode(value, readableFlavor = false)
             val restoredFromDense = Serializers.bytes.fromJsonCode(denseJson)
             assertThat(restoredFromDense).isEqualTo(value)
 
-            // Dense should produce a simple string
+            // Dense should produce a base64 string (not hex)
             assertThat(denseJson).startsWith("\"")
             assertThat(denseJson).endsWith("\"")
+            assertThat(denseJson).doesNotContain("hex:")
 
             // Binary serialization
             val bytes = Serializers.bytes.toBytes(value)
@@ -249,6 +250,51 @@ class SerializersTest {
         }
 
         assertThat(Serializers.bytes.fromJsonCode("0")).isEqualTo(ByteString.EMPTY)
+    }
+
+    @Test
+    fun `test bytes serializer - readable flavor`() {
+        val values =
+            listOf(
+                ByteString.EMPTY,
+                "hello".encodeUtf8(),
+                "world".encodeUtf8(),
+                "Hello, 世界!".encodeUtf8(),
+                ByteString.of(0, 255.toByte(), 127.toByte()),
+            )
+
+        for (value in values) {
+            // Test READABLE flavor (should use hex with "hex:" prefix)
+            val readableJson = Serializers.bytes.toJsonCode(value, readableFlavor = true)
+            val restoredFromReadable = Serializers.bytes.fromJsonCode(readableJson)
+            assertThat(restoredFromReadable).isEqualTo(value)
+
+            // Readable should produce a hex string with "hex:" prefix
+            assertThat(readableJson).startsWith("\"hex:")
+            assertThat(readableJson).endsWith("\"")
+
+            // Verify hex content is correct
+            val expectedHex = "\"hex:${value.hex()}\""
+            assertThat(readableJson).isEqualTo(expectedHex)
+        }
+    }
+
+    @Test
+    fun `test bytes serializer - fromJson handles both formats`() {
+        val testBytes = "hello".encodeUtf8()
+
+        // Test base64 format (dense)
+        val base64Json = "\"${testBytes.base64()}\""
+        val fromBase64 = Serializers.bytes.fromJsonCode(base64Json)
+        assertThat(fromBase64).isEqualTo(testBytes)
+
+        // Test hex format (readable)
+        val hexJson = "\"hex:${testBytes.hex()}\""
+        val fromHex = Serializers.bytes.fromJsonCode(hexJson)
+        assertThat(fromHex).isEqualTo(testBytes)
+
+        // Both should produce the same result
+        assertThat(fromBase64).isEqualTo(fromHex)
     }
 
     @Test
@@ -497,6 +543,18 @@ class SerializersTest {
 
             val restored = Serializers.bytes.fromBytes(bytes.toByteArray())
             assertThat(restored).isEqualTo(value)
+
+            // Test JSON serialization in both flavors
+            val denseJson = Serializers.bytes.toJsonCode(value, readableFlavor = false)
+            val readableJson = Serializers.bytes.toJsonCode(value, readableFlavor = true)
+
+            // Dense should be base64
+            assertThat(denseJson).doesNotContain("hex:")
+            assertThat(Serializers.bytes.fromJsonCode(denseJson)).isEqualTo(value)
+
+            // Readable should be hex with prefix
+            assertThat(readableJson).startsWith("\"hex:")
+            assertThat(Serializers.bytes.fromJsonCode(readableJson)).isEqualTo(value)
         }
     }
 

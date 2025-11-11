@@ -22,6 +22,7 @@ import okio.Buffer
 import okio.BufferedSource
 import okio.ByteString
 import okio.ByteString.Companion.decodeBase64
+import okio.ByteString.Companion.decodeHex
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
@@ -611,7 +612,11 @@ private object BytesSerializer : PrimitiveSerializer<ByteString>(), PrimitiveDes
         input: ByteString,
         readableFlavor: Boolean,
     ): JsonElement {
-        return JsonPrimitive(input.base64())
+        return if (readableFlavor) {
+            JsonPrimitive("hex:${input.hex()}")
+        } else {
+            JsonPrimitive(input.base64())
+        }
     }
 
     override fun fromJson(
@@ -620,11 +625,16 @@ private object BytesSerializer : PrimitiveSerializer<ByteString>(), PrimitiveDes
     ): ByteString {
         val jsonPrimitive = json.jsonPrimitive
         return if (jsonPrimitive.isString) {
-            jsonPrimitive.content.decodeBase64()!!
+            val content = jsonPrimitive.content
+            if (content.startsWith("hex:")) {
+                content.substring(4).decodeHex()
+            } else {
+                content.decodeBase64()!!
+            }
         } else if (jsonPrimitive.intOrNull == 0) {
             ByteString.EMPTY
         } else {
-            throw IllegalArgumentException("Expected: base64 string")
+            throw IllegalArgumentException("Expected: base64 or hex string")
         }
     }
 

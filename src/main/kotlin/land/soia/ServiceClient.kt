@@ -4,11 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URI
-import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.nio.charset.StandardCharsets
 import java.time.Duration
 
 /** Sends RPCs to a soia service. */
@@ -25,16 +23,10 @@ class ServiceClient(
         }
     }
 
-    enum class HttpMethod {
-        GET,
-        POST,
-    }
-
     /** Invokes the given method on the remote server through an RPC. */
     suspend fun <Request, Response> invokeRemote(
         method: Method<Request, Response>,
         request: Request,
-        httpMethod: HttpMethod = HttpMethod.POST,
         requestHeaders: Map<String, List<String>> = defaultRequestHeaders,
         timeout: Duration = MAX_DURATION,
     ): Response =
@@ -56,20 +48,9 @@ class ServiceClient(
                 httpRequestBuilder.timeout(timeout)
             }
 
-            when (httpMethod) {
-                HttpMethod.POST -> {
-                    httpRequestBuilder
-                        .uri(serviceUri)
-                        .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                }
-                HttpMethod.GET -> {
-                    val encodedBody = URLEncoder.encode(requestBody.replace("%", "%25"), StandardCharsets.UTF_8)
-                    val urlWithQuery = "$serviceUri?$encodedBody"
-                    httpRequestBuilder
-                        .uri(URI(urlWithQuery))
-                        .GET()
-                }
-            }
+            httpRequestBuilder
+                .uri(serviceUri)
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
 
             val httpRequest = httpRequestBuilder.build()
             val httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString())
