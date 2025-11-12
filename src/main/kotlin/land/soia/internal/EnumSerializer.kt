@@ -187,7 +187,7 @@ class EnumSerializer<Enum : Any> private constructor(
             readableFlavor: Boolean,
         ): JsonElement {
             val value = getValue(input)
-            val valueToJson = valueSerializer.toJson(value)
+            val valueToJson = valueSerializer.impl.toJson(value, readableFlavor)
             return if (readableFlavor) {
                 JsonObject(
                     mapOf(

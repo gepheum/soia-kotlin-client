@@ -1,9 +1,10 @@
-package land.soia.internal
+package land.soia
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import land.soia.internal.INDENT_UNIT
 
 fun formatDenseJson(element: JsonElement): String {
     val stringBuilder = StringBuilder()

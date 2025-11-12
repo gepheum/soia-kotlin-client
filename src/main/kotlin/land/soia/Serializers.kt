@@ -148,6 +148,7 @@ private object BoolSerializer : PrimitiveSerializer<Boolean>(), PrimitiveDescrip
         val primitive = json.jsonPrimitive
         return when (primitive.content) {
             "0" -> false
+            "0.0" -> false
             "false" -> false
             else -> true
         }
@@ -490,7 +491,7 @@ private object StringSerializer : PrimitiveSerializer<String>(), PrimitiveDescri
         keepUnrecognizedFields: Boolean,
     ): String {
         val wire = buffer.readByte().toInt() and 0xFF
-        return if (wire == 242) {
+        return if (wire == 0 || wire == 242) {
             ""
         } else {
             // Should be wire 243
@@ -675,10 +676,11 @@ private object TimestampSerializer : PrimitiveSerializer<Instant>(), PrimitiveDe
     ): JsonElement {
         val unixMillis = clampUnixMillis(input.toEpochMilli())
         return if (readableFlavor) {
+            val clampedInstant = Instant.ofEpochMilli(unixMillis)
             JsonObject(
                 mapOf(
                     "unix_millis" to JsonPrimitive(unixMillis),
-                    "formatted" to JsonPrimitive(Instant.ofEpochMilli(unixMillis).toString()),
+                    "formatted" to JsonPrimitive(DateTimeFormatter.ISO_INSTANT.format(clampedInstant)),
                 ),
             )
         } else {
