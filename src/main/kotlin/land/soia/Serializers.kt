@@ -204,8 +204,8 @@ private object Int32Serializer : PrimitiveSerializer<Int>(), PrimitiveDescriptor
     override val typeDescriptor get() = this
 }
 
-private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740992 // -(2 ^ 53)
-private const val MAX_SAFE_JAVASCRIPT_INT = 9007199254740992 // -(2 ^ 53)
+private const val MIN_SAFE_JAVASCRIPT_INT = -9007199254740991 // -(2 ^ 53 - 1)
+private const val MAX_SAFE_JAVASCRIPT_INT = 9007199254740991 // 2 ^ 53 - 1
 
 private object Int64Serializer : PrimitiveSerializer<Long>(), PrimitiveDescriptor {
     override fun isDefault(value: Long): Boolean {

@@ -1,11 +1,10 @@
 package land.soia.reflection
 
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import land.soia.internal.RecordId
+import land.soia.internal.formatReadableJson
 
 interface TypeDescriptorBase
 
@@ -359,8 +358,8 @@ fun TypeDescriptor.asJson(): JsonObject {
     addRecordDefinitions(this, recordIdToDefinition)
     return JsonObject(
         mapOf(
-            "records" to JsonArray(recordIdToDefinition.values.toList()),
             "type" to getTypeSignature(this),
+            "records" to JsonArray(recordIdToDefinition.values.toList()),
         ),
     )
 }
@@ -371,7 +370,7 @@ fun TypeDescriptor.asJson(): JsonObject {
  * @return A pretty-printed JSON string describing the type
  */
 fun TypeDescriptor.asJsonCode(): String {
-    return readableJson.encodeToString(JsonElement.serializer(), asJson())
+    return formatReadableJson(asJson())
 }
 
 /**
@@ -391,13 +390,6 @@ fun TypeDescriptor.Reflective.asJson(): JsonObject {
 fun TypeDescriptor.Reflective.asJsonCode(): String {
     return this.notReflective().asJsonCode()
 }
-
-@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-private val readableJson =
-    Json {
-        prettyPrint = true
-        prettyPrintIndent = "  "
-    }
 
 private fun getTypeSignature(typeDescriptor: TypeDescriptor): JsonObject {
     return when (typeDescriptor) {

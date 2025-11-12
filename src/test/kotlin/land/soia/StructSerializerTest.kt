@@ -832,6 +832,10 @@ class StructSerializerTest {
         val actualJson = personSerializer.typeDescriptor.asJsonCode()
         val expectedJson =
             "{\n" +
+                "  \"type\": {\n" +
+                "    \"kind\": \"record\",\n" +
+                "    \"value\": \"foo:Person\"\n" +
+                "  },\n" +
                 "  \"records\": [\n" +
                 "    {\n" +
                 "      \"kind\": \"struct\",\n" +
@@ -886,14 +890,9 @@ class StructSerializerTest {
                 "          }\n" +
                 "        }\n" +
                 "      ],\n" +
-                "      \"removed_fields\": [\n" +
-                "      ]\n" +
+                "      \"removed_fields\": []\n" +
                 "    }\n" +
-                "  ],\n" +
-                "  \"type\": {\n" +
-                "    \"kind\": \"record\",\n" +
-                "    \"value\": \"foo:Person\"\n" +
-                "  }\n" +
+                "  ]\n" +
                 "}"
         assertThat(actualJson).isEqualTo(expectedJson)
 

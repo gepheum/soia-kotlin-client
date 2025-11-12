@@ -476,6 +476,10 @@ class EnumSerializerTest {
     fun `test enum serializer - type descriptor`() {
         val expectedJson =
             "{\n" +
+                "  \"type\": {\n" +
+                "    \"kind\": \"record\",\n" +
+                "    \"value\": \"foo.bar:Color.Status\"\n" +
+                "  },\n" +
                 "  \"records\": [\n" +
                 "    {\n" +
                 "      \"kind\": \"enum\",\n" +
@@ -506,11 +510,7 @@ class EnumSerializerTest {
                 "        4\n" +
                 "      ]\n" +
                 "    }\n" +
-                "  ],\n" +
-                "  \"type\": {\n" +
-                "    \"kind\": \"record\",\n" +
-                "    \"value\": \"foo.bar:Color.Status\"\n" +
-                "  }\n" +
+                "  ]\n" +
                 "}"
         assertThat(
             statusSerializer.typeDescriptor.asJsonCode(),

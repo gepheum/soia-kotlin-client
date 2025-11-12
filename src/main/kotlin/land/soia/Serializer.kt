@@ -4,6 +4,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import land.soia.internal.MustNameArguments
 import land.soia.internal.SerializerImpl
+import land.soia.internal.formatDenseJson
+import land.soia.internal.formatReadableJson
 import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.ByteString
@@ -56,9 +58,9 @@ class Serializer<T> internal constructor(
     ): String {
         val jsonElement = this.impl.toJson(input, readableFlavor = readableFlavor)
         return if (readableFlavor) {
-            readableJson.encodeToString(JsonElement.serializer(), jsonElement)
+            formatReadableJson(jsonElement)
         } else {
-            Json.Default.encodeToString(JsonElement.serializer(), jsonElement)
+            formatDenseJson(jsonElement)
         }
     }
 
@@ -171,13 +173,4 @@ class Serializer<T> internal constructor(
      * types, and other metadata useful for introspection and tooling.
      */
     val typeDescriptor: TypeDescriptor.Reflective get() = this.impl.typeDescriptor
-
-    companion object {
-        @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-        private val readableJson =
-            Json {
-                prettyPrint = true
-                prettyPrintIndent = "  "
-            }
-    }
 }
