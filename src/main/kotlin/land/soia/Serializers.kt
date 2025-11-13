@@ -149,6 +149,7 @@ private object BoolSerializer : PrimitiveSerializer<Boolean>(), PrimitiveDescrip
         return when (primitive.content) {
             "0" -> false
             "0.0" -> false
+            "-0.0" -> false
             "false" -> false
             else -> true
         }

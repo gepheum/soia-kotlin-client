@@ -442,7 +442,11 @@ class EnumSerializer<Enum : Any> private constructor(
     // =========================================================================
 
     override val fields: List<EnumField.Reflective<Enum>>
-        get() = java.util.Collections.unmodifiableList(mutableFields)
+        get() =
+            java.util.Collections.unmodifiableList(
+                // Exclude the 'unknown' field which is always at the end.
+                mutableFields.subList(0, mutableFields.size - 1),
+            )
 
     override val removedNumbers: Set<Int>
         get() = java.util.Collections.unmodifiableSet(mutableRemovedNumbers)

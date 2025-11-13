@@ -500,10 +500,6 @@ class EnumSerializerTest {
                 "            \"kind\": \"primitive\",\n" +
                 "            \"value\": \"string\"\n" +
                 "          }\n" +
-                "        },\n" +
-                "        {\n" +
-                "          \"name\": \"?\",\n" +
-                "          \"number\": 0\n" +
                 "        }\n" +
                 "      ],\n" +
                 "      \"removed_fields\": [\n" +
