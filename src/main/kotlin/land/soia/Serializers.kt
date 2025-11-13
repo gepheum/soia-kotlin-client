@@ -190,7 +190,12 @@ private object Int32Serializer : PrimitiveSerializer<Int>(), PrimitiveDescriptor
         json: JsonElement,
         keepUnrecognizedFields: Boolean,
     ): Int {
-        return json.jsonPrimitive.content.toInt()
+        val content = json.jsonPrimitive.content
+        return try {
+            content.toInt()
+        } catch (_: NumberFormatException) {
+            content.toDouble().toInt()
+        }
     }
 
     override fun appendString(
@@ -248,7 +253,12 @@ private object Int64Serializer : PrimitiveSerializer<Long>(), PrimitiveDescripto
         json: JsonElement,
         keepUnrecognizedFields: Boolean,
     ): Long {
-        return json.jsonPrimitive.content.toLong()
+        val content = json.jsonPrimitive.content
+        return try {
+            content.toLong()
+        } catch (_: NumberFormatException) {
+            content.toDouble().toLong()
+        }
     }
 
     override fun appendString(
@@ -315,7 +325,12 @@ private object Uint64Serializer : PrimitiveSerializer<ULong>(), PrimitiveDescrip
         json: JsonElement,
         keepUnrecognizedFields: Boolean,
     ): ULong {
-        return json.jsonPrimitive.content.toULong()
+        val content = json.jsonPrimitive.content
+        return try {
+            content.toULong()
+        } catch (_: NumberFormatException) {
+            content.toDouble().toULong()
+        }
     }
 
     override fun appendString(
@@ -530,7 +545,7 @@ private object StringSerializer : PrimitiveSerializer<String>(), PrimitiveDescri
     ) {
         // Appends a quoted string which can be copied to a Kotlin source file.
         out.append('"')
-        for (i in 0 until input.length) {
+        for (i in input.indices) {
             when (val char = input[i]) {
                 '\\' -> out.append("\\\\")
                 '"' -> out.append("\\\"")
@@ -694,8 +709,15 @@ private object TimestampSerializer : PrimitiveSerializer<Instant>(), PrimitiveDe
         keepUnrecognizedFields: Boolean,
     ): Instant {
         val unixMillisElement = if (json is JsonObject) json["unix_millis"]!! else json
-        val unixMillis = clampUnixMillis(unixMillisElement.jsonPrimitive.content.toLong())
-        return Instant.ofEpochMilli(unixMillis)
+        val unixMillisContent = unixMillisElement.jsonPrimitive.content
+        val unixMillis =
+            try {
+                unixMillisContent.toLong()
+            } catch (e: NumberFormatException) {
+                unixMillisContent.toDouble().toLong()
+            }
+        val clampedUnixMillis = clampUnixMillis(unixMillis)
+        return Instant.ofEpochMilli(clampedUnixMillis)
     }
 
     override fun appendString(
