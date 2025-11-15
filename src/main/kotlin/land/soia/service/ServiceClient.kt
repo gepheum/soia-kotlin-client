@@ -1,7 +1,8 @@
-package land.soia
+package land.soia.service
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import land.soia.UnrecognizedFieldsPolicy
 import java.io.IOException
 import java.net.URI
 import java.net.http.HttpClient
@@ -57,7 +58,7 @@ class ServiceClient(
 
             if (httpResponse.statusCode() in 200..299) {
                 val jsonCode = httpResponse.body()
-                method.responseSerializer.fromJsonCode(jsonCode, keepUnrecognizedFields = true)
+                method.responseSerializer.fromJsonCode(jsonCode, UnrecognizedFieldsPolicy.KEEP)
             } else {
                 var message = ""
                 val contentType = httpResponse.headers().firstValue("content-type").orElse("")

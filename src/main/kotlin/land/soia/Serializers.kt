@@ -29,45 +29,59 @@ import java.time.format.DateTimeFormatter
 /**
  * Provides predefined serializers for all primitive types and utilities for creating
  * composite serializers such as optional and list serializers.
- *
- * This object serves as the main entry point for accessing serializers for basic types
- * like integers, strings, timestamps, etc., as well as for constructing more complex
- * serializers for optional values and collections.
  */
 object Serializers {
-    /** Serializer for Boolean values. */
+    /** Serializer for boolean values. */
+    @JvmStatic
+    @get:JvmName("bool")
     val bool: Serializer<Boolean> = Serializer(BoolSerializer)
 
     /** Serializer for 32-bit signed integers. */
+    @JvmStatic
+    @get:JvmName("int32")
     val int32: Serializer<Int> = Serializer(Int32Serializer)
 
     /** Serializer for 64-bit signed integers. */
+    @JvmStatic
+    @get:JvmName("int64")
     val int64: Serializer<Long> = Serializer(Int64Serializer)
 
     /** Serializer for 64-bit unsigned integers. */
+    @JvmStatic
+    @get:JvmName("uint64")
     val uint64: Serializer<ULong> = Serializer(Uint64Serializer)
 
     /** Serializer for 32-bit floating-point numbers. */
+    @JvmStatic
+    @get:JvmName("float32")
     val float32: Serializer<Float> = Serializer(Float32Serializer)
 
     /** Serializer for 64-bit floating-point numbers. */
+    @JvmStatic
+    @get:JvmName("float64")
     val float64: Serializer<Double> = Serializer(Float64Serializer)
 
     /** Serializer for UTF-8 strings. */
+    @JvmStatic
+    @get:JvmName("string")
     val string: Serializer<String> = Serializer(StringSerializer)
 
-    /** Serializer for binary data (byte arrays). */
+    /** Serializer for byte strings. */
+    @JvmStatic
+    @get:JvmName("bytes")
     val bytes: Serializer<ByteString> = Serializer(BytesSerializer)
 
     /** Serializer for timestamp values. */
+    @JvmStatic
+    @get:JvmName("timestamp")
     val timestamp: Serializer<Instant> = Serializer(TimestampSerializer)
 
     /**
-     * Creates a serializer for optional values of type [T].
+     * Creates a serializer for nullable values of type [T]?.
      *
-     * @param other The serializer for the wrapped type
-     * @return A serializer that can handle null values of the given type
+     * @param other The serializer for the non-nullable type
      */
+    @JvmStatic
     fun <T> optional(other: Serializer<T>): Serializer<T?> {
         val otherImpl = other.impl
         return if (otherImpl is OptionalSerializer<*>) {
@@ -80,10 +94,12 @@ object Serializers {
 
     /**
      * Creates a serializer for lists of elements of type [E].
+     * The lists returned by this serializer are immutable. Any attempt to modify them
+     * is guaranteed to throw an exception.
      *
      * @param item The serializer for individual list elements
-     * @return A serializer that can handle lists of the given element type
      */
+    @JvmStatic
     fun <E> list(item: Serializer<E>): Serializer<List<E>> {
         return listSerializer(item)
     }

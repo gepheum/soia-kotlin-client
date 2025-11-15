@@ -39,7 +39,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
             input: Frozen,
             readableFlavor: Boolean,
         ): JsonElement {
-            return serializer.toJson(getter(input), readableFlavor = readableFlavor)
+            return serializer.impl.toJson(getter(input), readableFlavor = readableFlavor)
         }
 
         fun valueFromJson(
@@ -47,7 +47,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
             json: JsonElement,
             keepUnrecognizedFields: Boolean,
         ) {
-            val value = serializer.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields)
+            val value = serializer.impl.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields)
             setter(mutable, value)
         }
 

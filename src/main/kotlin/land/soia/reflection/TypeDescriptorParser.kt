@@ -1,6 +1,5 @@
 package land.soia.reflection
 
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
@@ -18,7 +17,7 @@ import land.soia.internal.RecordId
  * @param json The JSON element containing the type descriptor data
  * @return The parsed TypeDescriptor
  */
-fun parseTypeDescriptor(json: JsonElement): TypeDescriptor {
+internal fun parseTypeDescriptorImpl(json: JsonElement): TypeDescriptor {
     val jsonObject = json.jsonObject
     val records = jsonObject["records"]?.jsonArray ?: listOf()
     val recordIdToBundle = mutableMapOf<String, RecordBundle>()
@@ -50,7 +49,7 @@ fun parseTypeDescriptor(json: JsonElement): TypeDescriptor {
                         val typeJson = fieldObject["type"]
                         if (typeJson != null) {
                             val type = parseTypeDescriptorImpl(typeJson, recordIdToBundle)
-                            EnumValueField(name = name, number = number, type = type)
+                            EnumWrapperField(name = name, number = number, type = type)
                         } else {
                             EnumConstantField(name = name, number = number)
                         }
@@ -60,17 +59,6 @@ fun parseTypeDescriptor(json: JsonElement): TypeDescriptor {
     }
     val type = jsonObject["type"]!!
     return parseTypeDescriptorImpl(type, recordIdToBundle)
-}
-
-/**
- * Parses a type descriptor from its JSON string representation.
- *
- * @param jsonCode The JSON string containing the type descriptor data
- * @return The parsed TypeDescriptor
- */
-fun parseTypeDescriptor(jsonCode: String): TypeDescriptor {
-    val jsonElement = Json.Default.decodeFromString(JsonElement.serializer(), jsonCode)
-    return parseTypeDescriptor(jsonElement)
 }
 
 private class RecordBundle(

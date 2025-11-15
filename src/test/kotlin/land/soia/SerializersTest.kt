@@ -10,9 +10,10 @@ import land.soia.reflection.OptionalDescriptor
 import land.soia.reflection.PrimitiveDescriptor
 import land.soia.reflection.RecordDescriptor
 import land.soia.reflection.StructDescriptor
+import land.soia.reflection.TypeDescriptor
 import land.soia.reflection.asJson
 import land.soia.reflection.asJsonCode
-import land.soia.reflection.parseTypeDescriptor
+import land.soia.reflection.parseTypeDescriptorImpl
 import okio.ByteString
 import okio.ByteString.Companion.decodeHex
 import okio.ByteString.Companion.encodeUtf8
@@ -23,10 +24,10 @@ class SerializersTest {
     @Test
     fun `test bool serializer - basic functionality`() {
         // Test true value - should be 1 in dense, true in readable
-        assertThat((Serializers.bool.toJson(false, readableFlavor = true).jsonPrimitive.content)).isEqualTo("false")
-        assertThat((Serializers.bool.toJson(false, readableFlavor = false).jsonPrimitive.content)).isEqualTo("0")
-        assertThat((Serializers.bool.toJson(true, readableFlavor = true).jsonPrimitive.content)).isEqualTo("true")
-        assertThat((Serializers.bool.toJson(true, readableFlavor = false).jsonPrimitive.content)).isEqualTo("1")
+        assertThat((Serializers.bool.toJson(false, JsonFlavor.READABLE).jsonPrimitive.content)).isEqualTo("false")
+        assertThat((Serializers.bool.toJson(false).jsonPrimitive.content)).isEqualTo("0")
+        assertThat((Serializers.bool.toJson(true, JsonFlavor.READABLE).jsonPrimitive.content)).isEqualTo("true")
+        assertThat((Serializers.bool.toJson(true).jsonPrimitive.content)).isEqualTo("1")
 
         // Test round-trip
         assertThat(Serializers.bool.fromJson(JsonPrimitive(true))).isEqualTo(true)
@@ -80,9 +81,9 @@ class SerializersTest {
 
             // JsonFlavor shouldn't affect primitive numbers
             assertThat(
-                Serializers.int32.toJsonCode(value, readableFlavor = false),
+                Serializers.int32.toJsonCode(value),
             ).isEqualTo(
-                Serializers.int32.toJsonCode(value, readableFlavor = true),
+                Serializers.int32.toJsonCode(value, JsonFlavor.READABLE),
             )
         }
     }
@@ -213,9 +214,9 @@ class SerializersTest {
 
             // JsonFlavor shouldn't affect plain strings
             assertThat(
-                Serializers.string.toJsonCode(value, readableFlavor = true),
+                Serializers.string.toJsonCode(value, JsonFlavor.READABLE),
             ).isEqualTo(
-                Serializers.string.toJsonCode(value, readableFlavor = false),
+                Serializers.string.toJsonCode(value),
             )
         }
 
@@ -234,7 +235,7 @@ class SerializersTest {
 
         for (value in values) {
             // Test DENSE flavor (should use base64)
-            val denseJson = Serializers.bytes.toJsonCode(value, readableFlavor = false)
+            val denseJson = Serializers.bytes.toJsonCode(value)
             val restoredFromDense = Serializers.bytes.fromJsonCode(denseJson)
             assertThat(restoredFromDense).isEqualTo(value)
 
@@ -265,7 +266,7 @@ class SerializersTest {
 
         for (value in values) {
             // Test READABLE flavor (should use hex with "hex:" prefix)
-            val readableJson = Serializers.bytes.toJsonCode(value, readableFlavor = true)
+            val readableJson = Serializers.bytes.toJsonCode(value, JsonFlavor.READABLE)
             val restoredFromReadable = Serializers.bytes.fromJsonCode(readableJson)
             assertThat(restoredFromReadable).isEqualTo(value)
 
@@ -308,7 +309,7 @@ class SerializersTest {
             )
 
         for (instant in instants) {
-            val denseJson = Serializers.timestamp.toJsonCode(instant, readableFlavor = false)
+            val denseJson = Serializers.timestamp.toJsonCode(instant)
             val restored = Serializers.timestamp.fromJsonCode(denseJson)
             assertThat(restored).isEqualTo(instant)
 
@@ -326,7 +327,7 @@ class SerializersTest {
     @Test
     fun `test timestamp serializer - readable flavor`() {
         val instant = Instant.parse("2025-08-25T10:30:45Z")
-        val readableJson = Serializers.timestamp.toJsonCode(instant, readableFlavor = true)
+        val readableJson = Serializers.timestamp.toJsonCode(instant, JsonFlavor.READABLE)
 
         // Readable should produce an object with unix_millis and formatted
         assertThat(
@@ -545,8 +546,8 @@ class SerializersTest {
             assertThat(restored).isEqualTo(value)
 
             // Test JSON serialization in both flavors
-            val denseJson = Serializers.bytes.toJsonCode(value, readableFlavor = false)
-            val readableJson = Serializers.bytes.toJsonCode(value, readableFlavor = true)
+            val denseJson = Serializers.bytes.toJsonCode(value)
+            val readableJson = Serializers.bytes.toJsonCode(value, JsonFlavor.READABLE)
 
             // Dense should be base64
             assertThat(denseJson).doesNotContain("hex:")
@@ -728,28 +729,28 @@ class SerializersTest {
 
         // Test non-null values with different flavors
         val testInt = 42
-        val denseIntJson = intOptional.toJsonCode(testInt, readableFlavor = false)
-        val readableIntJson = intOptional.toJsonCode(testInt, readableFlavor = true)
+        val denseIntJson = intOptional.toJsonCode(testInt)
+        val readableIntJson = intOptional.toJsonCode(testInt, JsonFlavor.READABLE)
         assertThat(readableIntJson).isEqualTo(denseIntJson) // Should be the same for int32
 
         // Test instant with different flavors
         val testTimestamp = Instant.parse("2025-08-25T12:00:00Z")
-        val denseTimestampJson = instantOptional.toJsonCode(testTimestamp, readableFlavor = false)
-        val readableTimestampJson = instantOptional.toJsonCode(testTimestamp, readableFlavor = true)
+        val denseTimestampJson = instantOptional.toJsonCode(testTimestamp)
+        val readableTimestampJson = instantOptional.toJsonCode(testTimestamp, JsonFlavor.READABLE)
         // Dense should be a number, readable should be an object
         assertThat(denseTimestampJson.toLongOrNull() != null).isTrue()
         assertThat(readableTimestampJson.contains("unix_millis")).isTrue()
 
         // Test bool with different flavors
         val testBool = true
-        val denseBoolJson = boolOptional.toJsonCode(testBool, readableFlavor = false)
-        val readableBoolJson = boolOptional.toJsonCode(testBool, readableFlavor = true)
+        val denseBoolJson = boolOptional.toJsonCode(testBool)
+        val readableBoolJson = boolOptional.toJsonCode(testBool, JsonFlavor.READABLE)
         assertThat(denseBoolJson).isEqualTo("1") // Dense should be "1"
         assertThat(readableBoolJson).isEqualTo("true") // Readable should be "true"
 
         // Test null with different flavors (should always be "null")
-        val nullDense = intOptional.toJsonCode(null, readableFlavor = false)
-        val nullReadable = intOptional.toJsonCode(null, readableFlavor = true)
+        val nullDense = intOptional.toJsonCode(null)
+        val nullReadable = intOptional.toJsonCode(null, JsonFlavor.READABLE)
         assertThat(nullDense).isEqualTo("null")
         assertThat(nullReadable).isEqualTo("null")
     }
@@ -1407,13 +1408,13 @@ class SerializersTest {
             is StructDescriptor.Reflective<*, *> -> {}
             is EnumDescriptor.Reflective<*> -> {}
         }
-        when (parseTypeDescriptor(Serializers.bool.typeDescriptor.asJson())) {
+        when (parseTypeDescriptorImpl(Serializers.bool.typeDescriptor.asJson())) {
             is PrimitiveDescriptor -> {}
             is OptionalDescriptor -> {}
             is ListDescriptor -> {}
             is RecordDescriptor<*> -> {}
         }
-        when (parseTypeDescriptor(Serializers.bool.typeDescriptor.asJsonCode())) {
+        when (TypeDescriptor.parseFromJsonCode(Serializers.bool.typeDescriptor.asJsonCode())) {
             is PrimitiveDescriptor -> {}
             is OptionalDescriptor -> {}
             is ListDescriptor -> {}

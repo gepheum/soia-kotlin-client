@@ -7,9 +7,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import land.soia.internal.StructSerializer
 import land.soia.internal.UnrecognizedFields
 import land.soia.internal.toStringImpl
+import land.soia.reflection.TypeDescriptor
 import land.soia.reflection.asJson
 import land.soia.reflection.asJsonCode
-import land.soia.reflection.parseTypeDescriptor
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
@@ -275,8 +275,8 @@ class StructSerializerTest {
             )
 
         // Test JSON roundtrip with both flavors
-        val denseJson = personSerializer.toJsonCode(testPerson, readableFlavor = false)
-        val readableJson = personSerializer.toJsonCode(testPerson, readableFlavor = true)
+        val denseJson = personSerializer.toJsonCode(testPerson)
+        val readableJson = personSerializer.toJsonCode(testPerson, JsonFlavor.READABLE)
 
         val restoredFromDense = personSerializer.fromJsonCode(denseJson)
         val restoredFromReadable = personSerializer.fromJsonCode(readableJson)
@@ -379,8 +379,8 @@ class StructSerializerTest {
         val serializer = Serializer(serializerWithRemovedFields)
 
         // Test JSON roundtrips - should still work normally
-        val denseJson = serializer.toJsonCode(testStruct, readableFlavor = false)
-        val readableJson = serializer.toJsonCode(testStruct, readableFlavor = true)
+        val denseJson = serializer.toJsonCode(testStruct)
+        val readableJson = serializer.toJsonCode(testStruct, JsonFlavor.READABLE)
 
         val restoredFromDense = serializer.fromJsonCode(denseJson)
         val restoredFromReadable = serializer.fromJsonCode(readableJson)
@@ -512,10 +512,10 @@ class StructSerializerTest {
             )
 
         // Step 1: Serialize with full serializer to dense JSON
-        val fullJson = personSerializer.toJsonCode(fullPerson, readableFlavor = false)
+        val fullJson = personSerializer.toJsonCode(fullPerson, JsonFlavor.DENSE)
 
         // Step 2: Deserialize with partial serializer (should capture unrecognized fields)
-        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, UnrecognizedFieldsPolicy.KEEP)
 
         // Verify the known fields are correct
         assertThat(partialPerson.name).isEqualTo("John Doe")
@@ -527,10 +527,10 @@ class StructSerializerTest {
         assertThat(partialPerson.unrecognizedFields?.jsonElements).isNotNull()
 
         // Step 3: Serialize with partial serializer (should preserve unrecognized fields)
-        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson)
 
         // Step 4: Deserialize with full serializer (should restore original values)
-        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+        val restoredPerson = personSerializer.fromJsonCode(partialJson)
 
         // Verify full roundtrip preserves all original values
         assertThat(restoredPerson.name).isEqualTo("John Doe")
@@ -553,11 +553,11 @@ class StructSerializerTest {
             )
 
         // Step 1: Serialize with full serializer to readable JSON
-        val fullJson = personSerializer.toJsonCode(fullPerson, readableFlavor = true)
+        val fullJson = personSerializer.toJsonCode(fullPerson, JsonFlavor.READABLE)
 
         // Step 2: Deserialize with partial serializer
         // Note: Readable format doesn't preserve unrecognized fields, so we only get known fields
-        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, UnrecognizedFieldsPolicy.KEEP)
 
         // Verify the known fields are correct
         assertThat(partialPerson.name).isEqualTo("Jane Smith")
@@ -568,10 +568,10 @@ class StructSerializerTest {
         assertThat(partialPerson.unrecognizedFields).isNull()
 
         // Step 3: Serialize with partial serializer
-        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = true)
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, JsonFlavor.READABLE)
 
         // Step 4: Deserialize with full serializer
-        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+        val restoredPerson = personSerializer.fromJsonCode(partialJson)
 
         // Verify known fields are preserved, unknown fields are defaults
         assertThat(restoredPerson.name).isEqualTo("Jane Smith")
@@ -597,7 +597,7 @@ class StructSerializerTest {
         val fullBytes = personSerializer.toBytes(fullPerson)
 
         // Step 2: Deserialize with partial serializer (should capture unrecognized fields)
-        val partialPerson = partialPersonSerializer.fromBytes(fullBytes.toByteArray(), keepUnrecognizedFields = true)
+        val partialPerson = partialPersonSerializer.fromBytes(fullBytes.toByteArray(), UnrecognizedFieldsPolicy.KEEP)
 
         // Verify the known fields are correct
         assertThat(partialPerson.name).isEqualTo("Bob Wilson")
@@ -612,7 +612,7 @@ class StructSerializerTest {
         val partialBytes = partialPersonSerializer.toBytes(partialPerson)
 
         // Step 4: Deserialize with full serializer (should restore original values)
-        val restoredPerson = personSerializer.fromBytes(partialBytes.toByteArray(), keepUnrecognizedFields = false)
+        val restoredPerson = personSerializer.fromBytes(partialBytes.toByteArray())
 
         // Verify full roundtrip preserves all original values
         assertThat(restoredPerson.name).isEqualTo("Bob Wilson")
@@ -635,10 +635,10 @@ class StructSerializerTest {
             )
 
         // Step 1: Serialize with full serializer
-        val fullJson = personSerializer.toJsonCode(fullPerson, readableFlavor = false)
+        val fullJson = personSerializer.toJsonCode(fullPerson, JsonFlavor.DENSE)
 
         // Step 2: Deserialize with partial serializer WITHOUT keepUnrecognizedFields
-        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = false)
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson)
 
         // Verify the known fields are correct
         assertThat(partialPerson.name).isEqualTo("Alice Brown")
@@ -649,10 +649,10 @@ class StructSerializerTest {
         assertThat(partialPerson.unrecognizedFields).isNull()
 
         // Step 3: Serialize with partial serializer
-        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, JsonFlavor.DENSE)
 
         // Step 4: Deserialize with full serializer
-        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+        val restoredPerson = personSerializer.fromJsonCode(partialJson)
 
         // Verify known fields are preserved, unknown fields are defaults
         assertThat(restoredPerson.name).isEqualTo("Alice Brown")
@@ -675,10 +675,10 @@ class StructSerializerTest {
             )
 
         // Step 1: Serialize with full serializer to dense JSON
-        val fullJson = personSerializer.toJsonCode(fullPerson, readableFlavor = false)
+        val fullJson = personSerializer.toJsonCode(fullPerson)
 
         // Step 2: Deserialize with partial serializer
-        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, UnrecognizedFieldsPolicy.KEEP)
 
         // Verify the known fields are correct
         assertThat(partialPerson.name).isEqualTo("Charlie Davis")
@@ -689,8 +689,8 @@ class StructSerializerTest {
         assertThat(partialPerson.unrecognizedFields).isNotNull()
 
         // Step 3: Roundtrip through partial serializer
-        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
-        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson)
+        val restoredPerson = personSerializer.fromJsonCode(partialJson)
 
         // Verify roundtrip preserves all values
         assertThat(restoredPerson.name).isEqualTo("Charlie Davis")
@@ -718,11 +718,11 @@ class StructSerializerTest {
         for (i in 1..3) {
             // Full -> Binary -> Partial (with unrecognized fields)
             val fullBytes = personSerializer.toBytes(currentData)
-            val partialPerson = partialPersonSerializer.fromBytes(fullBytes.toByteArray(), keepUnrecognizedFields = true)
+            val partialPerson = partialPersonSerializer.fromBytes(fullBytes.toByteArray(), UnrecognizedFieldsPolicy.KEEP)
 
             // Partial -> Binary -> Full (restore from unrecognized fields)
             val partialBytes = partialPersonSerializer.toBytes(partialPerson)
-            currentData = personSerializer.fromBytes(partialBytes.toByteArray(), keepUnrecognizedFields = false)
+            currentData = personSerializer.fromBytes(partialBytes.toByteArray())
         }
 
         // After multiple roundtrips, should still equal the original
@@ -739,16 +739,16 @@ class StructSerializerTest {
         val defaultPerson = PersonFrozen() // all defaults
 
         // Full -> Partial -> Full roundtrip with defaults
-        val fullJson = personSerializer.toJsonCode(defaultPerson, readableFlavor = false)
-        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, keepUnrecognizedFields = true)
-        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, readableFlavor = false)
-        val restoredPerson = personSerializer.fromJsonCode(partialJson, keepUnrecognizedFields = false)
+        val fullJson = personSerializer.toJsonCode(defaultPerson, JsonFlavor.DENSE)
+        val partialPerson = partialPersonSerializer.fromJsonCode(fullJson, UnrecognizedFieldsPolicy.KEEP)
+        val partialJson = partialPersonSerializer.toJsonCode(partialPerson, JsonFlavor.DENSE)
+        val restoredPerson = personSerializer.fromJsonCode(partialJson)
 
         // Should be identical to original default
         assertThat(restoredPerson).isEqualTo(defaultPerson)
 
         // Test with empty JSON array
-        val emptyArrayPerson = partialPersonSerializer.fromJsonCode("[]", keepUnrecognizedFields = true)
+        val emptyArrayPerson = partialPersonSerializer.fromJsonCode("[]", UnrecognizedFieldsPolicy.KEEP)
         assertThat(emptyArrayPerson).isEqualTo(PartialPersonFrozen())
 
         // Test with large slot count but mostly defaults
@@ -761,12 +761,11 @@ class StructSerializerTest {
                 tags = listOf("only-this-matters"),
             )
 
-        val sparseJson = personSerializer.toJsonCode(sparseFullPerson, readableFlavor = false)
-        val sparsePartial = partialPersonSerializer.fromJsonCode(sparseJson, keepUnrecognizedFields = true)
+        val sparseJson = personSerializer.toJsonCode(sparseFullPerson, JsonFlavor.DENSE)
+        val sparsePartial = partialPersonSerializer.fromJsonCode(sparseJson, UnrecognizedFieldsPolicy.KEEP)
         val restoredSparse =
             personSerializer.fromJsonCode(
-                partialPersonSerializer.toJsonCode(sparsePartial, readableFlavor = false),
-                keepUnrecognizedFields = false,
+                partialPersonSerializer.toJsonCode(sparsePartial, JsonFlavor.DENSE),
             )
 
         assertThat(restoredSparse.toString()).isEqualTo(sparseFullPerson.toString())
@@ -896,7 +895,7 @@ class StructSerializerTest {
         assertThat(actualJson).isEqualTo(expectedJson)
 
         assertThat(
-            parseTypeDescriptor(personSerializer.typeDescriptor.asJson()).asJsonCode(),
+            TypeDescriptor.parseFromJson(personSerializer.typeDescriptor.asJson()).asJsonCode(),
         ).isEqualTo(expectedJson)
     }
 }

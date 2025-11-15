@@ -10,7 +10,7 @@ import land.soia.Serializer
 import land.soia.reflection.EnumConstantField
 import land.soia.reflection.EnumDescriptor
 import land.soia.reflection.EnumField
-import land.soia.reflection.EnumValueField
+import land.soia.reflection.EnumWrapperField
 import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
@@ -49,7 +49,7 @@ class EnumSerializer<Enum : Any> private constructor(
         addFieldImpl(ConstantField(number, name, instance.javaClass, instance))
     }
 
-    fun <Instance : Enum, T> addValueField(
+    fun <Instance : Enum, T> addWrapperField(
         number: Int,
         name: String,
         instanceType: Class<Instance>,
@@ -59,7 +59,7 @@ class EnumSerializer<Enum : Any> private constructor(
     ) {
         checkNotFinalized()
         @Suppress("UNCHECKED_CAST")
-        addFieldImpl(ValueField(number, name, instanceType, valueSerializer, wrap, getValue as (Enum) -> T))
+        addFieldImpl(WrapperField(number, name, instanceType, valueSerializer, wrap, getValue as (Enum) -> T))
     }
 
     fun addRemovedNumber(number: Int) {
@@ -96,7 +96,7 @@ class EnumSerializer<Enum : Any> private constructor(
             return when (this) {
                 is UnknownField<Enum> -> this
                 is ConstantField<Enum, *> -> this
-                is ValueField<Enum, *> -> this
+                is WrapperField<Enum, *> -> this
             }
         }
     }
@@ -174,14 +174,14 @@ class EnumSerializer<Enum : Any> private constructor(
         }
     }
 
-    private class ValueField<Enum : Any, T>(
+    private class WrapperField<Enum : Any, T>(
         override val number: Int,
         override val name: String,
         override val instanceType: Class<out Enum>,
         val valueSerializer: Serializer<T>,
         val wrapFn: (T) -> Enum,
         val getValue: (Enum) -> T,
-    ) : Field<Enum>(), EnumValueField.Reflective<Enum, T> {
+    ) : Field<Enum>(), EnumWrapperField.Reflective<Enum, T> {
         override fun toJson(
             input: Enum,
             readableFlavor: Boolean,
@@ -239,7 +239,7 @@ class EnumSerializer<Enum : Any> private constructor(
 
         companion object {
             internal fun <Enum : Any, T> wrapFromJson(
-                field: ValueField<Enum, T>,
+                field: WrapperField<Enum, T>,
                 json: JsonElement,
             ): Enum {
                 val value = field.valueSerializer.fromJson(json)
@@ -247,7 +247,7 @@ class EnumSerializer<Enum : Any> private constructor(
             }
 
             internal fun <Enum : Any, T> wrapDecoded(
-                field: ValueField<Enum, T>,
+                field: WrapperField<Enum, T>,
                 buffer: BufferedSource,
                 keepUnrecognizedFields: Boolean,
             ): Enum {
@@ -316,7 +316,7 @@ class EnumSerializer<Enum : Any> private constructor(
                     is UnknownField<Enum> -> unknown.constant
                     is ConstantField<Enum, *> -> field.constant
                     is RemovedNumber<Enum> -> unknown.constant
-                    is ValueField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a value field")
+                    is WrapperField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a wrapper field")
                     null ->
                         if (keepUnrecognizedFields && number != null) {
                             unknown.wrapUnrecognized(UnrecognizedEnum(json))
@@ -337,9 +337,9 @@ class EnumSerializer<Enum : Any> private constructor(
                 return when (field) {
                     is UnknownField<Enum>, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
                     is RemovedNumber<Enum> -> unknown.constant
-                    is ValueField<Enum, *> -> {
+                    is WrapperField<Enum, *> -> {
                         val second = json[1]
-                        ValueField.wrapFromJson(field, second)
+                        WrapperField.wrapFromJson(field, second)
                     }
                     null ->
                         if (keepUnrecognizedFields && number != null) {
@@ -354,7 +354,7 @@ class EnumSerializer<Enum : Any> private constructor(
                 val value = json["value"]!!
                 return when (val field = nameToField[name]) {
                     is UnknownField<Enum>, is ConstantField<Enum, *> -> throw IllegalArgumentException("$name refers to a constant field")
-                    is ValueField<Enum, *> -> ValueField.wrapFromJson(field, value)
+                    is WrapperField<Enum, *> -> WrapperField.wrapFromJson(field, value)
                     null -> unknown.constant
                 }
             }
@@ -381,7 +381,7 @@ class EnumSerializer<Enum : Any> private constructor(
                 is RemovedNumber -> unknown.constant
                 is UnknownField -> unknown.constant
                 is ConstantField<Enum, *> -> field.constant
-                is ValueField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a value field")
+                is WrapperField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a wrapper field")
                 null -> {
                     if (keepUnrecognizedFields) {
                         val bytes = Buffer()
@@ -400,8 +400,8 @@ class EnumSerializer<Enum : Any> private constructor(
                     unknown.constant
                 }
                 is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
-                is ValueField<Enum, *> ->
-                    ValueField.wrapDecoded(
+                is WrapperField<Enum, *> ->
+                    WrapperField.wrapDecoded(
                         field,
                         buffer,
                         keepUnrecognizedFields = keepUnrecognizedFields,
@@ -466,7 +466,7 @@ class EnumSerializer<Enum : Any> private constructor(
                                 ),
                             )
                         }
-                        is ValueField<Enum, *> -> {
+                        is WrapperField<Enum, *> -> {
                             JsonObject(
                                 mapOf(
                                     "name" to JsonPrimitive(it.name),
@@ -483,7 +483,7 @@ class EnumSerializer<Enum : Any> private constructor(
     }
 
     override fun dependencies(): List<SerializerImpl<*>> {
-        return fields.filterIsInstance<ValueField<*, *>>().map { it.valueSerializer.impl }
+        return fields.filterIsInstance<WrapperField<*, *>>().map { it.valueSerializer.impl }
     }
 
     override fun getField(name: String): EnumField.Reflective<Enum>? {

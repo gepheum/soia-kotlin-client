@@ -1,4 +1,6 @@
-package land.soia
+package land.soia.service
+
+import land.soia.Serializer
 
 /**
  * Identifies one method in a Soia service, both on the server side and the client side.
@@ -11,8 +13,12 @@ package land.soia
  * @param responseSerializer Serializer for the response type
  */
 class Method<Request, Response>(
+    @get:JvmName("name")
     val name: String,
+    @get:JvmName("number")
     val number: Int,
+    @get:JvmName("requestSerializer")
     val requestSerializer: Serializer<Request>,
+    @get:JvmName("responseSerializer")
     val responseSerializer: Serializer<Response>,
 )

@@ -14,6 +14,8 @@ interface KeyedList<T, K> : List<T> {
      *
      * The indexing, which runs in O(N), only happens the first time this map is
      * requested.
+     *
+     * If multiple elements have the same key, only the last one is added to the map.
      */
     val mapView: Map<K, T>
 

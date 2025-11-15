@@ -9,7 +9,7 @@ import land.soia.internal.UnrecognizedEnum
 import land.soia.internal.toStringImpl
 import land.soia.reflection.asJson
 import land.soia.reflection.asJsonCode
-import land.soia.reflection.parseTypeDescriptor
+import land.soia.reflection.parseTypeDescriptorImpl
 import okio.ByteString
 import org.junit.jupiter.api.Test
 
@@ -54,11 +54,11 @@ class EnumSerializerTest {
             addConstantField(1, "red", Color.RED)
             addConstantField(2, "green", Color.GREEN)
             addConstantField(3, "blue", Color.BLUE)
-            addValueField(4, "custom", Color.CustomOption::class.java, Serializers.int32, { Color.CustomOption(it) }, { it.rgb })
+            addWrapperField(4, "custom", Color.CustomOption::class.java, Serializers.int32, { Color.CustomOption(it) }, { it.rgb })
             finalizeEnum()
         }
 
-    // Complex enum with both constants and value fields
+    // Complex enum with both constants and wrapper fields
     private val statusEnumSerializer =
         EnumSerializer.create<Status, Status.Unknown>(
             "foo.bar:Color.Status",
@@ -68,7 +68,7 @@ class EnumSerializerTest {
         ).apply {
             addConstantField(1, "active", Status.ACTIVE)
             addConstantField(2, "inactive", Status.INACTIVE)
-            addValueField(3, "pending", Status.PendingOption::class.java, Serializers.string, { Status.PendingOption(it) }, { it.reason })
+            addWrapperField(3, "pending", Status.PendingOption::class.java, Serializers.string, { Status.PendingOption(it) }, { it.reason })
             addRemovedNumber(4) // Removed field number
             finalizeEnum()
         }
@@ -115,10 +115,10 @@ class EnumSerializerTest {
     }
 
     @Test
-    fun `test enum serializer - value fields dense JSON`() {
+    fun `test enum serializer - wrapper fields dense JSON`() {
         val customColor = Color.CustomOption(0xFF0000)
 
-        // Test value field serialization in dense format
+        // Test wrapper field serialization in dense format
         val customJson = colorEnumSerializer.toJson(customColor, readableFlavor = false)
         assertThat(customJson).isInstanceOf(JsonArray::class.java)
 
@@ -134,10 +134,10 @@ class EnumSerializerTest {
     }
 
     @Test
-    fun `test enum serializer - value fields readable JSON`() {
+    fun `test enum serializer - wrapper fields readable JSON`() {
         val customColor = Color.CustomOption(0x00FF00)
 
-        // Test value field serialization in readable format
+        // Test wrapper field serialization in readable format
         val customJson = colorEnumSerializer.toJson(customColor, readableFlavor = true)
         assertThat(customJson).isInstanceOf(JsonObject::class.java)
 
@@ -176,10 +176,10 @@ class EnumSerializerTest {
     }
 
     @Test
-    fun `test enum serializer - binary format value fields`() {
+    fun `test enum serializer - binary format wrapper fields`() {
         val customColor = Color.CustomOption(42)
 
-        // Test binary encoding for value fields
+        // Test binary encoding for wrapper fields
         val customBytes = colorSerializer.toBytes(customColor)
         assertThat(customBytes.hex()).startsWith("736f6961")
 
@@ -208,7 +208,7 @@ class EnumSerializerTest {
         val unknownName = colorEnumSerializer.fromJson(JsonPrimitive("purple"), keepUnrecognizedFields = false)
         assertThat(unknownName).isInstanceOf(Color.Unknown::class.java)
 
-        // Test unknown value field
+        // Test unknown wrapper field
         val unknownValue =
             colorEnumSerializer.fromJson(
                 JsonArray(listOf(JsonPrimitive(99), JsonPrimitive(123))),
@@ -225,7 +225,7 @@ class EnumSerializerTest {
         val unknownEnum = (unknownConstant as Color.Unknown).unrecognized
         assertThat(unknownEnum?.jsonElement).isEqualTo(JsonPrimitive(99))
 
-        // Test unknown value field with keepUnrecognizedFields = true
+        // Test unknown wrapper field with keepUnrecognizedFields = true
         val unknownValueJson = JsonArray(listOf(JsonPrimitive(99), JsonPrimitive(123)))
         val unknownValue = colorEnumSerializer.fromJson(unknownValueJson, keepUnrecognizedFields = true)
         assertThat(unknownValue).isInstanceOf(Color.Unknown::class.java)
@@ -237,12 +237,12 @@ class EnumSerializerTest {
     fun `test enum serializer - unknown values with keep unrecognized - binary`() {
         // Test unknown constant number with keepUnrecognizedFields = true
         val serializer = Serializer(colorEnumSerializer)
-        val unknownConstant = serializer.fromBytes(byteArrayOf(115, 111, 105, 97, 10), keepUnrecognizedFields = true)
+        val unknownConstant = serializer.fromBytes(byteArrayOf(115, 111, 105, 97, 10), UnrecognizedFieldsPolicy.KEEP)
         assertThat(unknownConstant).isInstanceOf(Color.Unknown::class.java)
         val unknownEnum = (unknownConstant as Color.Unknown).unrecognized
         assertThat(unknownEnum?.bytes).isEqualTo(ByteString.of(10))
 
-        val unknownValue = serializer.fromBytes(byteArrayOf(115, 111, 105, 97, -8, 10, 11), keepUnrecognizedFields = true)
+        val unknownValue = serializer.fromBytes(byteArrayOf(115, 111, 105, 97, -8, 10, 11), UnrecognizedFieldsPolicy.KEEP)
         assertThat(unknownValue).isInstanceOf(Color.Unknown::class.java)
         val unknownValueEnum = (unknownValue as Color.Unknown).unrecognized
         assertThat(unknownValueEnum?.bytes).isEqualTo(ByteString.of(-8, 10, 11))
@@ -272,8 +272,8 @@ class EnumSerializerTest {
         val pendingStatus = Status.PendingOption("waiting for approval")
 
         // Test JSON roundtrips
-        val denseJson = statusSerializer.toJsonCode(pendingStatus, readableFlavor = false)
-        val readableJson = statusSerializer.toJsonCode(pendingStatus, readableFlavor = true)
+        val denseJson = statusSerializer.toJsonCode(pendingStatus)
+        val readableJson = statusSerializer.toJsonCode(pendingStatus, JsonFlavor.READABLE)
 
         val restoredFromDense = statusSerializer.fromJsonCode(denseJson)
         val restoredFromReadable = statusSerializer.fromJsonCode(readableJson)
@@ -298,8 +298,8 @@ class EnumSerializerTest {
 
         constantValues.forEach { status ->
             // Test JSON roundtrips
-            val denseJson = statusSerializer.toJsonCode(status, readableFlavor = false)
-            val readableJson = statusSerializer.toJsonCode(status, readableFlavor = true)
+            val denseJson = statusSerializer.toJsonCode(status, JsonFlavor.DENSE)
+            val readableJson = statusSerializer.toJsonCode(status, JsonFlavor.READABLE)
 
             val restoredFromDense = statusSerializer.fromJsonCode(denseJson)
             val restoredFromReadable = statusSerializer.fromJsonCode(readableJson)
@@ -360,8 +360,8 @@ class EnumSerializerTest {
 
         edgeCases.forEach { color ->
             // Test JSON roundtrips
-            val denseJson = colorSerializer.toJsonCode(color, readableFlavor = false)
-            val readableJson = colorSerializer.toJsonCode(color, readableFlavor = true)
+            val denseJson = colorSerializer.toJsonCode(color)
+            val readableJson = colorSerializer.toJsonCode(color, JsonFlavor.READABLE)
 
             val restoredFromDense = colorSerializer.fromJsonCode(denseJson)
             val restoredFromReadable = colorSerializer.fromJsonCode(readableJson)
@@ -383,18 +383,18 @@ class EnumSerializerTest {
 
     @Test
     fun `test enum serializer - json format consistency`() {
-        // Test that dense and readable formats are different for value fields but same for constants
+        // Test that dense and readable formats are different for wrapper fields but same for constants
         val redConstant = Color.RED
         val customValue = Color.CustomOption(0xABCDEF)
 
         // Constants should be different between dense/readable
-        val redDenseJson = colorSerializer.toJsonCode(redConstant, readableFlavor = false)
-        val redReadableJson = colorSerializer.toJsonCode(redConstant, readableFlavor = true)
+        val redDenseJson = colorSerializer.toJsonCode(redConstant)
+        val redReadableJson = colorSerializer.toJsonCode(redConstant, JsonFlavor.READABLE)
         assertThat(redDenseJson).isNotEqualTo(redReadableJson)
 
-        // Value fields should be different between dense/readable
-        val customDenseJson = colorSerializer.toJsonCode(customValue, readableFlavor = false)
-        val customReadableJson = colorSerializer.toJsonCode(customValue, readableFlavor = true)
+        // Wrapper fields should be different between dense/readable
+        val customDenseJson = colorSerializer.toJsonCode(customValue)
+        val customReadableJson = colorSerializer.toJsonCode(customValue, JsonFlavor.READABLE)
         assertThat(customDenseJson).isNotEqualTo(customReadableJson)
 
         // Dense should be array/number, readable should be string/object
@@ -420,7 +420,7 @@ class EnumSerializerTest {
             assertThat(restored).isEqualTo(constant)
         }
 
-        // Test value field
+        // Test wrapper field
         val customColor = Color.CustomOption(42)
         val bytes = colorSerializer.toBytes(customColor)
         val restored = colorSerializer.fromBytes(bytes.toByteArray())
@@ -440,8 +440,8 @@ class EnumSerializerTest {
 
         testCases.forEach { testCase ->
             // Test JSON roundtrips
-            val denseJson = statusSerializer.toJsonCode(testCase, readableFlavor = false)
-            val readableJson = statusSerializer.toJsonCode(testCase, readableFlavor = true)
+            val denseJson = statusSerializer.toJsonCode(testCase)
+            val readableJson = statusSerializer.toJsonCode(testCase, JsonFlavor.READABLE)
 
             val restoredFromDense = statusSerializer.fromJsonCode(denseJson)
             val restoredFromReadable = statusSerializer.fromJsonCode(readableJson)
@@ -514,7 +514,7 @@ class EnumSerializerTest {
             expectedJson,
         )
         assertThat(
-            parseTypeDescriptor(statusSerializer.typeDescriptor.asJson()).asJsonCode(),
+            parseTypeDescriptorImpl(statusSerializer.typeDescriptor.asJson()).asJsonCode(),
         ).isEqualTo(
             expectedJson,
         )

@@ -1,6 +1,8 @@
 package land.soia.reflection
 
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import land.soia.formatReadableJson
@@ -10,6 +12,25 @@ interface TypeDescriptorBase
 
 /** Describes a Soia type. */
 sealed interface TypeDescriptor : TypeDescriptorBase {
+    companion object {
+        /**
+         * Parses a type descriptor from its JSON string representation, as returned by
+         * [asJsonCode].
+         */
+        fun parseFromJsonCode(jsonCode: String): TypeDescriptor {
+            val jsonElement = Json.Default.decodeFromString(JsonElement.serializer(), jsonCode)
+            return parseTypeDescriptorImpl(jsonElement)
+        }
+
+        /**
+         * Parses a type descriptor from its JSON representation, as returned by
+         * [asJson].
+         */
+        fun parseFromJson(json: JsonElement): TypeDescriptor {
+            return parseTypeDescriptorImpl(json)
+        }
+    }
+
     /** Adds runtime introspection capabilities to a [TypeDescriptor]. */
     sealed interface Reflective : TypeDescriptorBase
 }
@@ -66,6 +87,7 @@ interface OptionalDescriptorBase<OtherType : TypeDescriptorBase> : TypeDescripto
 class OptionalDescriptor internal constructor(
     override val otherType: TypeDescriptor,
 ) : OptionalDescriptorBase<TypeDescriptor>, TypeDescriptor {
+    /** Adds runtime introspection capabilities to an [OptionalDescriptor]. */
     interface Reflective : OptionalDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
 }
 
@@ -84,11 +106,12 @@ class ListDescriptor internal constructor(
     override val itemType: TypeDescriptor,
     override val keyProperty: String?,
 ) : ListDescriptorBase<TypeDescriptor>, TypeDescriptor {
+    /** Adds runtime introspection capabilities to a [ListDescriptor]. */
     interface Reflective : ListDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
 }
 
 interface FieldBase {
-    /** Field name as specified in the `.soia` file, e.g. "user_id". */
+    /** Field name as specified in the `.soia` file, for example "user_id" or "MONDAY". */
     val name: String
 
     /** Field number. */
@@ -96,7 +119,7 @@ interface FieldBase {
 }
 
 interface RecordDescriptorBase<Field : FieldBase> : TypeDescriptorBase {
-    /** Name of the struct as specified in the `.soia` file. */
+    /** Name of the record as specified in the `.soia` file. */
     val name: String
 
     /**
@@ -107,10 +130,7 @@ interface RecordDescriptorBase<Field : FieldBase> : TypeDescriptorBase {
      */
     val qualifiedName: String
 
-    /**
-     * Path to the module where the struct is defined, relative to the root of the
-     * project.
-     */
+    /** Path to the `.soia` file relative to the root of the soia source directory. */
     val modulePath: String
 
     /** The field numbers marked as removed. */
@@ -158,6 +178,7 @@ sealed class RecordDescriptor<Field : FieldBase> : RecordDescriptorBase<Field>, 
         fields.associateBy { it.number }
     }
 
+    /** Adds runtime introspection capabilities to a [RecordDescriptor]. */
     sealed interface Reflective<Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor.Reflective
 }
 
@@ -166,11 +187,14 @@ interface StructFieldBase<TypeDescriptor : TypeDescriptorBase> : FieldBase {
     val type: TypeDescriptor
 }
 
+/** Describes a field in a struct. */
 class StructField internal constructor(
+    /** Field name as specified in the `.soia` file, for example "user_id". */
     override val name: String,
     override val number: Int,
     override val type: TypeDescriptor,
 ) : StructFieldBase<TypeDescriptor> {
+    /** Adds runtime introspection capabilities to a [StructField]. */
     interface Reflective<Frozen, Mutable, Value> : StructFieldBase<TypeDescriptor.Reflective> {
         /** Extracts the value of the field from the given struct. */
         fun get(struct: Frozen): Value
@@ -187,6 +211,8 @@ interface StructDescriptorBase<Field : StructFieldBase<*>> : RecordDescriptorBas
 
 /**
  * Describes a Soia struct type with its fields and structure.
+ *
+ * @property name
  */
 class StructDescriptor internal constructor(
     private val recordId: RecordId,
@@ -196,10 +222,16 @@ class StructDescriptor internal constructor(
     override var fields: List<StructField> = fields
         internal set
 
+    /** Name of the struct as specified in the `.soia` file. */
     override val name: String get() = recordId.name
+
+    /** Qualified struct name, for example "Foo" or "Foo.Bar" if `Bar` is nested. */
     override val qualifiedName: String get() = recordId.qualifiedName
+
+    /** Path to the `.soia` file relative to the root of the soia source directory. */
     override val modulePath: String get() = recordId.modulePath
 
+    /** Adds runtime introspection capabilities to a [StructDescriptor]. */
     interface Reflective<Frozen, Mutable> :
         StructDescriptorBase<StructField.Reflective<Frozen, Mutable, *>>,
         RecordDescriptor.Reflective<StructField.Reflective<Frozen, Mutable, *>> {
@@ -216,45 +248,43 @@ class StructDescriptor internal constructor(
     }
 }
 
+/** Describes a field in an enum. Can be either a constant field or a wrapper field. */
 sealed interface EnumField : FieldBase {
+    /** Adds runtime introspection capabilities to an [EnumField]. */
     sealed interface Reflective<Enum> : FieldBase
 }
 
 interface EnumConstantFieldBase : FieldBase
 
-/**
- * Describes an enum constant field (a field that represents a simple named value).
- */
+/** Describes an enum constant field. */
 class EnumConstantField internal constructor(
     override val name: String,
     override val number: Int,
 ) : EnumConstantFieldBase, EnumField {
+    /** Adds runtime introspection capabilities to an [EnumConstantField]. */
     interface Reflective<Enum> : EnumConstantFieldBase, EnumField.Reflective<Enum> {
         /** The constant value represented by this field. */
         val constant: Enum
     }
 }
 
-interface EnumValueFieldBase<TypeDescriptor : TypeDescriptorBase> : FieldBase {
+interface EnumWrapperFieldBase<TypeDescriptor : TypeDescriptorBase> : FieldBase {
     /** The type of the value associated with this enum field. */
     val type: TypeDescriptor
 }
 
-/**
- * Describes an enum value field (a field that can hold additional data).
- */
-class EnumValueField internal constructor(
+/** Describes an enum wrapper field. */
+class EnumWrapperField internal constructor(
     override val name: String,
     override val number: Int,
     override val type: TypeDescriptor,
-) : EnumValueFieldBase<TypeDescriptor>, EnumField {
-    /**
-     * Reflective interface for enum value fields.
+) : EnumWrapperFieldBase<TypeDescriptor>, EnumField {
+    /** Adds runtime introspection capabilities to an [EnumWrapperField].
      *
      * @param Enum The enum type
      * @param Value The type of the associated value
      */
-    interface Reflective<Enum, Value> : EnumValueFieldBase<TypeDescriptor.Reflective>, EnumField.Reflective<Enum> {
+    interface Reflective<Enum, Value> : EnumWrapperFieldBase<TypeDescriptor.Reflective>, EnumField.Reflective<Enum> {
         /** Returns whether the given enum instance if it matches this enum field. */
         fun test(e: Enum): Boolean
 
@@ -274,9 +304,7 @@ class EnumValueField internal constructor(
 
 interface EnumDescriptorBase<Field : FieldBase> : RecordDescriptorBase<Field>
 
-/**
- * Describes a Soia enum type with its possible values and associated data.
- */
+/** Describes a Soia enum type. */
 class EnumDescriptor internal constructor(
     private val recordId: RecordId,
     override val removedNumbers: Set<Int>,
@@ -285,12 +313,17 @@ class EnumDescriptor internal constructor(
     override var fields: List<EnumField> = fields
         internal set
 
+    /** Name of the enum as specified in the `.soia` file. */
     override val name: String get() = recordId.name
+
+    /** Qualified enum name, for example "Foo" or "Foo.Bar" if `Bar` is nested. */
     override val qualifiedName: String get() = recordId.qualifiedName
+
+    /** Path to the `.soia` file relative to the root of the soia source directory. */
     override val modulePath: String get() = recordId.modulePath
 
     /**
-     * Reflective interface for enum descriptors.
+     * Adds runtime introspection capabilities to an [EnumDescriptor].
      *
      * @param Enum The enum type
      */
@@ -330,8 +363,8 @@ fun TypeDescriptor.Reflective.notReflective(): TypeDescriptor {
                 recordId = RecordId.parse(this.recordId()),
                 fields =
                     this.fields.map {
-                        if (it is EnumValueField.Reflective<*, *>) {
-                            EnumValueField(
+                        if (it is EnumWrapperField.Reflective<*, *>) {
+                            EnumWrapperField(
                                 name = it.name,
                                 number = it.number,
                                 type = it.type.notReflective(),
@@ -349,9 +382,19 @@ fun TypeDescriptor.Reflective.notReflective(): TypeDescriptor {
 }
 
 /**
- * Converts this type descriptor to its JSON representation.
+ * Returns the stringified JSON representation of this type descriptor.
  *
- * @return A JsonObject containing the complete type information
+ * @return A pretty-printed JSON string describing the type
+ */
+fun TypeDescriptor.asJsonCode(): String {
+    return formatReadableJson(asJson())
+}
+
+/**
+ * Returns the JSON representation of this type descriptor.
+ * If you just need the stringified JSON, call [asJsonCode] instead.
+ *
+ * @return A JsonObject describing the type
  */
 fun TypeDescriptor.asJson(): JsonObject {
     val recordIdToDefinition = mutableMapOf<String, JsonObject>()
@@ -365,30 +408,22 @@ fun TypeDescriptor.asJson(): JsonObject {
 }
 
 /**
- * Converts this type descriptor to a JSON string representation.
- *
- * @return A pretty-printed JSON string describing the type
- */
-fun TypeDescriptor.asJsonCode(): String {
-    return formatReadableJson(asJson())
-}
-
-/**
- * Converts this reflective type descriptor to its JSON representation.
- *
- * @return A JsonObject containing the complete type information
- */
-fun TypeDescriptor.Reflective.asJson(): JsonObject {
-    return this.notReflective().asJson()
-}
-
-/**
- * Converts this reflective type descriptor to a JSON string representation.
+ * Returns the stringified JSON representation of this type descriptor.
  *
  * @return A pretty-printed JSON string describing the type
  */
 fun TypeDescriptor.Reflective.asJsonCode(): String {
     return this.notReflective().asJsonCode()
+}
+
+/**
+ * Returns the JSON representation of this type descriptor.
+ * If you just need the stringified JSON, call [asJsonCode] instead.
+ *
+ * @return A JsonObject describing the type
+ */
+fun TypeDescriptor.Reflective.asJson(): JsonObject {
+    return this.notReflective().asJson()
 }
 
 private fun getTypeSignature(typeDescriptor: TypeDescriptor): JsonObject {
@@ -489,7 +524,7 @@ private fun addRecordDefinitions(
             val fields =
                 typeDescriptor.fields.map {
                     when (it) {
-                        is EnumValueField ->
+                        is EnumWrapperField ->
                             JsonObject(
                                 mapOf(
                                     "name" to JsonPrimitive(it.name),
@@ -516,7 +551,7 @@ private fun addRecordDefinitions(
                 recordDefinition["removed_numbers"] = JsonArray(typeDescriptor.removedNumbers.map { JsonPrimitive(it) })
             }
             recordIdToDefinition[recordId] = JsonObject(recordDefinition)
-            val dependencies = typeDescriptor.fields.mapNotNull { (it as? EnumValueField)?.type }
+            val dependencies = typeDescriptor.fields.mapNotNull { (it as? EnumWrapperField)?.type }
             for (dependency in dependencies) {
                 addRecordDefinitions(dependency, recordIdToDefinition)
             }

@@ -1,6 +1,7 @@
-package land.soia
+package land.soia.service
 
-import land.soia.internal.MustNameArguments
+import land.soia.JsonFlavor
+import land.soia.UnrecognizedFieldsPolicy
 import land.soia.reflection.asJson
 import java.net.http.HttpHeaders
 
@@ -21,16 +22,16 @@ class Service private constructor(private val impl: Impl<*>) {
     suspend fun handleRequest(
         requestBody: String,
         requestHeaders: HttpHeaders,
-        @Suppress("UNUSED_PARAMETER")
-        mustNameArguments: MustNameArguments = MustNameArguments,
-        keepUnrecognizedFields: Boolean = false,
+        unrecognizedFields: UnrecognizedFieldsPolicy,
     ): RawResponse {
-        return impl.handleRequest(requestBody, requestHeaders, keepUnrecognizedFields = keepUnrecognizedFields)
+        return impl.handleRequest(requestBody, requestHeaders, unrecognizedFields)
     }
 
     /** Raw response returned by the server. */
     data class RawResponse(
+        @get:JvmName("data")
         val data: String,
+        @get:JvmName("type")
         val type: ResponseType,
     ) {
         enum class ResponseType {
@@ -40,6 +41,7 @@ class Service private constructor(private val impl: Impl<*>) {
             SERVER_ERROR,
         }
 
+        @get:JvmName("statusCode")
         val statusCode: Int
             get() =
                 when (type) {
@@ -48,6 +50,7 @@ class Service private constructor(private val impl: Impl<*>) {
                     ResponseType.SERVER_ERROR -> 500
                 }
 
+        @get:JvmName("contentType")
         val contentType: String
             get() =
                 when (type) {
@@ -67,6 +70,11 @@ class Service private constructor(private val impl: Impl<*>) {
     ) {
         private val methodImpls: MutableMap<Int, MethodImpl<*, *, RequestMeta>> = mutableMapOf()
 
+        /**
+         * Registers the implementation of a method.
+         *
+         * @return `this` builder
+         */
         fun <Request, Response> addMethod(
             method: Method<Request, Response>,
             impl: suspend (req: Request, requestMeta: RequestMeta) -> Response,
@@ -89,7 +97,7 @@ class Service private constructor(private val impl: Impl<*>) {
         suspend fun handleRequest(
             requestBody: String,
             requestHeaders: HttpHeaders,
-            keepUnrecognizedFields: Boolean,
+            unrecognizedFields: UnrecognizedFieldsPolicy,
         ): RawResponse {
             if (requestBody.isEmpty() || requestBody == "list") {
                 val methodsData =
@@ -140,7 +148,7 @@ class Service private constructor(private val impl: Impl<*>) {
 
             val req: Any? =
                 try {
-                    methodImpl.method.requestSerializer.fromJsonCode(requestData, keepUnrecognizedFields = keepUnrecognizedFields)
+                    methodImpl.method.requestSerializer.fromJsonCode(requestData, unrecognizedFields)
                 } catch (e: Exception) {
                     return RawResponse(
                         "bad request: can't parse JSON: ${e.message}",
@@ -161,9 +169,9 @@ class Service private constructor(private val impl: Impl<*>) {
 
             val resJson: String =
                 try {
-                    val readableFlavor = format == "readable"
+                    val jsonFlavor = if (format == "readable") JsonFlavor.READABLE else JsonFlavor.DENSE
                     @Suppress("UNCHECKED_CAST")
-                    (methodImpl.method as Method<Any?, Any?>).responseSerializer.toJsonCode(res, readableFlavor = readableFlavor)
+                    (methodImpl.method as Method<Any?, Any?>).responseSerializer.toJsonCode(res, jsonFlavor)
                 } catch (e: Exception) {
                     return RawResponse(
                         "server error: can't serialize response to JSON: ${e.message}",

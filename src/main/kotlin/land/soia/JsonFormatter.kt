@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import land.soia.internal.INDENT_UNIT
 
-fun formatDenseJson(element: JsonElement): String {
+internal fun formatDenseJson(element: JsonElement): String {
     val stringBuilder = StringBuilder()
     formatDenseJson(element, stringBuilder)
     return stringBuilder.toString()
@@ -55,7 +55,7 @@ private fun formatDenseJson(
     }
 }
 
-fun formatReadableJson(element: JsonElement): String {
+internal fun formatReadableJson(element: JsonElement): String {
     val stringBuilder = StringBuilder()
     formatReadableJson(element, "", stringBuilder)
     return stringBuilder.toString()
