@@ -82,7 +82,7 @@ private fun parseRecordDescriptorPartial(json: JsonObject): RecordDescriptor<*> 
     val kind = json["kind"]!!.jsonPrimitive.content
     val recordId = RecordId.parse(json["id"]!!.jsonPrimitive.content)
     val removedNumbers =
-        json["removed_fields"]?.jsonArray?.map { it.jsonPrimitive.int }?.toSet() ?: setOf()
+        json["removed_numbers"]?.jsonArray?.map { it.jsonPrimitive.int }?.toSet() ?: setOf()
     return when (kind) {
         "struct" -> {
             StructDescriptor(recordId, removedNumbers)
@@ -125,8 +125,8 @@ private fun parseTypeDescriptorImpl(
         "array" -> {
             val valueObject = value.jsonObject
             val itemType = parseTypeDescriptorImpl(valueObject["item"]!!, recordIdToBundle)
-            val keyChain = valueObject["key_chain"]?.jsonPrimitive?.content
-            ListDescriptor(itemType, keyChain)
+            val keyExtractor = valueObject["key_extractor"]?.jsonPrimitive?.content
+            ListDescriptor(itemType, keyExtractor)
         }
         "record" -> {
             val recordId = value.jsonPrimitive.content

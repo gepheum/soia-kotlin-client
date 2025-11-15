@@ -19,10 +19,10 @@ fun <E> listSerializer(item: Serializer<E>): Serializer<List<E>> {
 
 fun <E, K> keyedListSerializer(
     item: Serializer<E>,
-    keyChain: String,
+    keyExtractor: String,
     getKey: (E) -> K,
 ): Serializer<KeyedList<E, K>> {
-    return Serializer(KeyedListSerializer(item.impl, keyChain, getKey))
+    return Serializer(KeyedListSerializer(item.impl, keyExtractor, getKey))
 }
 
 private abstract class AbstractListSerializer<E, L : List<E>>(
@@ -145,18 +145,18 @@ private class ListSerializer<E>(item: SerializerImpl<E>) : AbstractListSerialize
         return toFrozenList(list)
     }
 
-    override val keyChain: String?
+    override val keyProperty: String?
         get() = null
 }
 
 private class KeyedListSerializer<E, K>(
     item: SerializerImpl<E>,
-    override val keyChain: String,
+    override val keyProperty: String,
     val getKey: (E) -> K,
 ) : AbstractListSerializer<E, KeyedList<E, K>>(item) {
     override val emptyList: KeyedList<E, K> = emptyKeyedList()
 
     override fun toList(list: List<E>): KeyedList<E, K> {
-        return toKeyedList(list, keyChain, getKey)
+        return toKeyedList(list, keyProperty, getKey)
     }
 }

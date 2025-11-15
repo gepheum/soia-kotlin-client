@@ -889,8 +889,7 @@ class StructSerializerTest {
                 "            }\n" +
                 "          }\n" +
                 "        }\n" +
-                "      ],\n" +
-                "      \"removed_fields\": []\n" +
+                "      ]\n" +
                 "    }\n" +
                 "  ]\n" +
                 "}"

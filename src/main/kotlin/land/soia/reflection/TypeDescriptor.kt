@@ -74,7 +74,7 @@ interface ListDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptorBase
     val itemType: ItemType
 
     /** Optional key chain for keyed lists that support fast lookup by key. */
-    val keyChain: String?
+    val keyProperty: String?
 }
 
 /**
@@ -82,7 +82,7 @@ interface ListDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptorBase
  */
 class ListDescriptor internal constructor(
     override val itemType: TypeDescriptor,
-    override val keyChain: String?,
+    override val keyProperty: String?,
 ) : ListDescriptorBase<TypeDescriptor>, TypeDescriptor {
     interface Reflective : ListDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
 }
@@ -310,7 +310,7 @@ fun TypeDescriptor.Reflective.notReflective(): TypeDescriptor {
         is ListDescriptor.Reflective ->
             ListDescriptor(
                 itemType = this.itemType.notReflective(),
-                keyChain = this.keyChain,
+                keyProperty = this.keyProperty,
             )
         is StructDescriptor.Reflective<*, *> ->
             StructDescriptor(
@@ -426,10 +426,10 @@ private fun getTypeSignature(typeDescriptor: TypeDescriptor): JsonObject {
                     "kind" to JsonPrimitive("array"),
                     "value" to
                         JsonObject(
-                            if (typeDescriptor.keyChain != null) {
+                            if (typeDescriptor.keyProperty != null) {
                                 mapOf(
                                     "item" to getTypeSignature(typeDescriptor.itemType),
-                                    "key_chain" to JsonPrimitive(typeDescriptor.keyChain),
+                                    "key_extractor" to JsonPrimitive(typeDescriptor.keyProperty),
                                 )
                             } else {
                                 mapOf(
@@ -469,15 +469,16 @@ private fun addRecordDefinitions(
                         ),
                     )
                 }
-            recordIdToDefinition[recordId] =
-                JsonObject(
-                    mapOf(
-                        "kind" to JsonPrimitive("struct"),
-                        "id" to JsonPrimitive(recordId),
-                        "fields" to JsonArray(fields),
-                        "removed_fields" to JsonArray(typeDescriptor.removedNumbers.map { JsonPrimitive(it) }),
-                    ),
+            val recordDefinition =
+                mutableMapOf(
+                    "kind" to JsonPrimitive("struct"),
+                    "id" to JsonPrimitive(recordId),
+                    "fields" to JsonArray(fields),
                 )
+            if (typeDescriptor.removedNumbers.isNotEmpty()) {
+                recordDefinition["removed_numbers"] = JsonArray(typeDescriptor.removedNumbers.map { JsonPrimitive(it) })
+            }
+            recordIdToDefinition[recordId] = JsonObject(recordDefinition)
             val dependencies = typeDescriptor.fields.map { it.type }
             for (dependency in dependencies) {
                 addRecordDefinitions(dependency, recordIdToDefinition)
@@ -505,15 +506,16 @@ private fun addRecordDefinitions(
                             )
                     }
                 }
-            recordIdToDefinition[recordId] =
-                JsonObject(
-                    mapOf(
-                        "kind" to JsonPrimitive("enum"),
-                        "id" to JsonPrimitive(recordId),
-                        "fields" to JsonArray(fields),
-                        "removed_fields" to JsonArray(typeDescriptor.removedNumbers.map { JsonPrimitive(it) }),
-                    ),
+            val recordDefinition =
+                mutableMapOf(
+                    "kind" to JsonPrimitive("enum"),
+                    "id" to JsonPrimitive(recordId),
+                    "fields" to JsonArray(fields),
                 )
+            if (typeDescriptor.removedNumbers.isNotEmpty()) {
+                recordDefinition["removed_numbers"] = JsonArray(typeDescriptor.removedNumbers.map { JsonPrimitive(it) })
+            }
+            recordIdToDefinition[recordId] = JsonObject(recordDefinition)
             val dependencies = typeDescriptor.fields.mapNotNull { (it as? EnumValueField)?.type }
             for (dependency in dependencies) {
                 addRecordDefinitions(dependency, recordIdToDefinition)

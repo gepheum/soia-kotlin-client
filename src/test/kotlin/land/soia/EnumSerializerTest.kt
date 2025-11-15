@@ -502,7 +502,7 @@ class EnumSerializerTest {
                 "          }\n" +
                 "        }\n" +
                 "      ],\n" +
-                "      \"removed_fields\": [\n" +
+                "      \"removed_numbers\": [\n" +
                 "        4\n" +
                 "      ]\n" +
                 "    }\n" +

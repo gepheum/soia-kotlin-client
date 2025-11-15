@@ -47,7 +47,7 @@ sealed class RecordSerializer<T, Field : FieldBase> : SerializerImpl<T>(), Recor
                 "fields" to JsonArray(fieldDefinitions()),
             )
         if (removedNumbers.isNotEmpty()) {
-            recordDefinition["removed_fields"] = JsonArray(removedNumbers.map { JsonPrimitive(it) })
+            recordDefinition["removed_numbers"] = JsonArray(removedNumbers.map { JsonPrimitive(it) })
         }
         out[recordId] = JsonObject(recordDefinition)
         for (dependency in dependencies()) {
