@@ -1,12 +1,10 @@
 import com.vanniktech.maven.publish.SonatypeHost
-import org.jetbrains.dokka.gradle.engine.parameters.VisibilityModifier
 
 plugins {
     kotlin("jvm") version "2.0.0"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
     id("com.vanniktech.maven.publish") version "0.28.0"
-    id("org.jetbrains.dokka") version "2.0.0"
-    id("org.jetbrains.dokka-javadoc") version "2.0.0"
+    id("org.jetbrains.dokka") version "1.9.10"
 }
 
 group = "land.soia"
@@ -35,26 +33,20 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Configure Dokka using DGP v2 DSL
-dokka {
-    dokkaPublications.html {
-        outputDirectory.set(layout.buildDirectory.dir("dokka"))
-    }
+tasks.dokkaHtml.configure {
+    outputDirectory.set(layout.buildDirectory.dir("dokka"))
+}
 
-    dokkaPublications.javadoc {
-        outputDirectory.set(layout.buildDirectory.dir("docs/javadoc"))
-    }
-
-    dokkaSourceSets.configureEach {
-        documentedVisibilities(VisibilityModifier.Public)
-    }
+// Generate Javadoc-style documentation
+tasks.dokkaJavadoc.configure {
+    outputDirectory.set(layout.buildDirectory.dir("docs/javadoc"))
 }
 
 // Convenient alias for generating documentation
 tasks.register("generateDocs") {
     description = "Generates all documentation (HTML and Javadoc)"
     group = "documentation"
-    dependsOn("dokkaGenerate")
+    dependsOn(tasks.dokkaHtml, tasks.dokkaJavadoc)
 }
 
 // From https://proandroiddev.com/publishing-kotlin-multiplatform-libraries-with-sonatype-central-b40f7cc6866e

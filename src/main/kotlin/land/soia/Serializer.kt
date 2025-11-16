@@ -121,6 +121,7 @@ class Serializer<T> internal constructor(
 
     /**
      * Deserializes an object from its JSON representation.
+     * Works with both dense and readable JSON flavors.
      * Unrecognized fields are dropped.
      *
      * @param jsonCode The stringified JSON to deserialize
@@ -132,6 +133,7 @@ class Serializer<T> internal constructor(
 
     /**
      * Deserializes an object from its JSON representation.
+     * Works with both dense and readable JSON flavors.
      *
      * @param jsonCode The stringified JSON to deserialize
      * @param unrecognizedFields Whether to keep or drop unrecognized fields
@@ -148,6 +150,7 @@ class Serializer<T> internal constructor(
 
     /**
      * Deserializes an object from its JSON representation.
+     * Works with both dense and readable JSON flavors.
      * Unrecognized fields are dropped.
      *
      * @param json The JSON element to deserialize
@@ -159,6 +162,7 @@ class Serializer<T> internal constructor(
 
     /**
      * Deserializes an object from its JSON representation.
+     * Works with both dense and readable JSON flavors.
      *
      * @param json The JSON element to deserialize
      * @param unrecognizedFields Whether to keep or drop unrecognized fields

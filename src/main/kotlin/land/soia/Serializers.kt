@@ -27,8 +27,8 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 /**
- * Provides predefined serializers for all primitive types and utilities for creating
- * composite serializers such as optional and list serializers.
+ * Provides serializers for all primitive types and utilities for creating composite
+ * serializers such as optional and list serializers.
  */
 object Serializers {
     /** Serializer for boolean values. */
