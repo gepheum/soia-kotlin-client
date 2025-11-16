@@ -8,7 +8,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import land.soia.KeyedList
 import land.soia.Serializer
-import land.soia.reflection.ListDescriptor
+import land.soia.reflection.ArrayDescriptor
 import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.BufferedSource
@@ -27,7 +27,7 @@ fun <E, K> keyedListSerializer(
 
 private abstract class AbstractListSerializer<E, L : List<E>>(
     val item: SerializerImpl<E>,
-) : SerializerImpl<L>(), ListDescriptor.Reflective {
+) : SerializerImpl<L>(), ArrayDescriptor.Reflective {
     final override fun isDefault(value: L): Boolean {
         return value.isEmpty()
     }

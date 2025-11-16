@@ -114,7 +114,7 @@ private fun parseTypeDescriptorImpl(
             val valueObject = value.jsonObject
             val itemType = parseTypeDescriptorImpl(valueObject["item"]!!, recordIdToBundle)
             val keyExtractor = valueObject["key_extractor"]?.jsonPrimitive?.content
-            ListDescriptor(itemType, keyExtractor)
+            ArrayDescriptor(itemType, keyExtractor)
         }
         "record" -> {
             val recordId = value.jsonPrimitive.content

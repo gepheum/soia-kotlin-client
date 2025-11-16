@@ -4,8 +4,8 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import land.soia.internal.toStringImpl
+import land.soia.reflection.ArrayDescriptor
 import land.soia.reflection.EnumDescriptor
-import land.soia.reflection.ListDescriptor
 import land.soia.reflection.OptionalDescriptor
 import land.soia.reflection.PrimitiveDescriptor
 import land.soia.reflection.RecordDescriptor
@@ -1398,26 +1398,26 @@ class SerializersTest {
         when (Serializers.bool.typeDescriptor) {
             is PrimitiveDescriptor -> {}
             is OptionalDescriptor.Reflective -> {}
-            is ListDescriptor.Reflective -> {}
+            is ArrayDescriptor.Reflective -> {}
             is RecordDescriptor.Reflective<*> -> {}
         }
         when (Serializers.bool.typeDescriptor) {
             is PrimitiveDescriptor -> {}
             is OptionalDescriptor.Reflective -> {}
-            is ListDescriptor.Reflective -> {}
+            is ArrayDescriptor.Reflective -> {}
             is StructDescriptor.Reflective<*, *> -> {}
             is EnumDescriptor.Reflective<*> -> {}
         }
         when (parseTypeDescriptorImpl(Serializers.bool.typeDescriptor.asJson())) {
             is PrimitiveDescriptor -> {}
             is OptionalDescriptor -> {}
-            is ListDescriptor -> {}
+            is ArrayDescriptor -> {}
             is RecordDescriptor<*> -> {}
         }
         when (TypeDescriptor.parseFromJsonCode(Serializers.bool.typeDescriptor.asJsonCode())) {
             is PrimitiveDescriptor -> {}
             is OptionalDescriptor -> {}
-            is ListDescriptor -> {}
+            is ArrayDescriptor -> {}
             is StructDescriptor -> {}
             is EnumDescriptor -> {}
         }

@@ -91,23 +91,23 @@ class OptionalDescriptor internal constructor(
     interface Reflective : OptionalDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
 }
 
-interface ListDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptorBase {
+interface ArrayDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptorBase {
     /** Describes the type of the array items. */
     val itemType: ItemType
 
-    /** Optional key chain for keyed lists that support fast lookup by key. */
+    /** Optional key chain for keyed arrays that support fast lookup by key. */
     val keyProperty: String?
 }
 
 /**
- * Describes a list type containing elements of a specific type.
+ * Describes an array type containing elements of a specific type.
  */
-class ListDescriptor internal constructor(
+class ArrayDescriptor internal constructor(
     override val itemType: TypeDescriptor,
     override val keyProperty: String?,
-) : ListDescriptorBase<TypeDescriptor>, TypeDescriptor {
-    /** Adds runtime introspection capabilities to a [ListDescriptor]. */
-    interface Reflective : ListDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
+) : ArrayDescriptorBase<TypeDescriptor>, TypeDescriptor {
+    /** Adds runtime introspection capabilities to a [ArrayDescriptor]. */
+    interface Reflective : ArrayDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
 }
 
 interface FieldBase {
@@ -340,8 +340,8 @@ fun TypeDescriptor.Reflective.notReflective(): TypeDescriptor {
             OptionalDescriptor(
                 otherType = this.otherType.notReflective(),
             )
-        is ListDescriptor.Reflective ->
-            ListDescriptor(
+        is ArrayDescriptor.Reflective ->
+            ArrayDescriptor(
                 itemType = this.itemType.notReflective(),
                 keyProperty = this.keyProperty,
             )
@@ -455,7 +455,7 @@ private fun getTypeSignature(typeDescriptor: TypeDescriptor): JsonObject {
                     "value" to getTypeSignature(typeDescriptor.otherType),
                 ),
             )
-        is ListDescriptor ->
+        is ArrayDescriptor ->
             JsonObject(
                 mapOf(
                     "kind" to JsonPrimitive("array"),
@@ -491,7 +491,7 @@ private fun addRecordDefinitions(
     when (typeDescriptor) {
         is PrimitiveDescriptor -> {}
         is OptionalDescriptor -> addRecordDefinitions(typeDescriptor.otherType, recordIdToDefinition)
-        is ListDescriptor -> addRecordDefinitions(typeDescriptor.itemType, recordIdToDefinition)
+        is ArrayDescriptor -> addRecordDefinitions(typeDescriptor.itemType, recordIdToDefinition)
         is StructDescriptor -> {
             val recordId = typeDescriptor.recordId()
             val fields =
