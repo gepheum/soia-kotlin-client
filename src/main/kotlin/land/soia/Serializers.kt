@@ -880,9 +880,12 @@ private class JavaOptionalSerializer<T : Any>(val other: SerializerImpl<T>) :
         eolIndent: String,
     ) {
         if (input.isPresent) {
-            this.other.appendString(input.get(), out, eolIndent)
+            val newEolIndent = eolIndent + INDENT_UNIT
+            out.append("Optional.of(").append(newEolIndent)
+            this.other.appendString(input.get(), out, newEolIndent)
+            out.append(eolIndent).append(")")
         } else {
-            out.append("null")
+            out.append("Optional.empty()")
         }
     }
 
