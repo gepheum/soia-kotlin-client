@@ -82,14 +82,14 @@ object Serializers {
      * @param other The serializer for the non-nullable type
      */
     @JvmStatic
-    fun <T> optional(other: Serializer<T>): Serializer<T?> {
-        val otherImpl = other.impl
-        return if (otherImpl is OptionalSerializer<*>) {
-            @Suppress("UNCHECKED_CAST")
-            other as Serializer<T?>
-        } else {
-            Serializer(OptionalSerializer(otherImpl))
-        }
+    fun <T : Any> optional(other: Serializer<T>): Serializer<T?> {
+        return Serializer(OptionalSerializer(other.impl))
+    }
+
+    /** Creates a serializer for `java.util.Optional<T>`. */
+    @JvmStatic
+    fun <T : Any> javaOptional(other: Serializer<T>): Serializer<java.util.Optional<T>> {
+        return Serializer(JavaOptionalSerializer(other.impl))
     }
 
     /**
@@ -773,10 +773,10 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
         input: T?,
         buffer: Buffer,
     ) {
-        if (input == null) {
-            buffer.writeByte(255)
-        } else {
+        if (input != null) {
             this.other.encode(input, buffer)
+        } else {
+            buffer.writeByte(255)
         }
     }
 
@@ -808,10 +808,10 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
         input: T?,
         readableFlavor: Boolean,
     ): JsonElement {
-        return if (input == null) {
-            JsonNull
-        } else {
+        return if (input != null) {
             this.other.toJson(input, readableFlavor = readableFlavor)
+        } else {
+            JsonNull
         }
     }
 
@@ -823,6 +823,88 @@ private class OptionalSerializer<T>(val other: SerializerImpl<T>) : SerializerIm
             null
         } else {
             this.other.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields)
+        }
+    }
+
+    override val otherType: TypeDescriptor.Reflective
+        get() = other.typeDescriptor
+
+    override val typeSignature: JsonElement
+        get() =
+            JsonObject(
+                mapOf(
+                    "kind" to JsonPrimitive("optional"),
+                    "value" to other.typeSignature,
+                ),
+            )
+
+    override fun addRecordDefinitionsTo(out: MutableMap<String, JsonElement>) {
+        other.addRecordDefinitionsTo(out)
+    }
+
+    override val typeDescriptor get() = this
+}
+
+private class JavaOptionalSerializer<T : Any>(val other: SerializerImpl<T>) :
+    SerializerImpl<java.util.Optional<T>>(), OptionalDescriptor.Reflective {
+    override fun isDefault(value: java.util.Optional<T>): Boolean {
+        return !value.isPresent
+    }
+
+    override fun encode(
+        input: java.util.Optional<T>,
+        buffer: Buffer,
+    ) {
+        if (input.isPresent) {
+            this.other.encode(input.get(), buffer)
+        } else {
+            buffer.writeByte(255)
+        }
+    }
+
+    override fun decode(
+        buffer: BufferedSource,
+        keepUnrecognizedFields: Boolean,
+    ): java.util.Optional<T> {
+        return if (buffer.peek().readByte().toInt() and 0xFF == 255) {
+            buffer.skip(1)
+            java.util.Optional.empty()
+        } else {
+            java.util.Optional.of(this.other.decode(buffer, keepUnrecognizedFields = keepUnrecognizedFields))
+        }
+    }
+
+    override fun appendString(
+        input: java.util.Optional<T>,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        if (input.isPresent) {
+            this.other.appendString(input.get(), out, eolIndent)
+        } else {
+            out.append("null")
+        }
+    }
+
+    override fun toJson(
+        input: java.util.Optional<T>,
+        readableFlavor: Boolean,
+    ): JsonElement {
+        return if (input.isPresent) {
+            this.other.toJson(input.get(), readableFlavor = readableFlavor)
+        } else {
+            JsonNull
+        }
+    }
+
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): java.util.Optional<T> {
+        return if (json is JsonNull) {
+            java.util.Optional.empty()
+        } else {
+            java.util.Optional.of(this.other.fromJson(json, keepUnrecognizedFields = keepUnrecognizedFields))
         }
     }
 

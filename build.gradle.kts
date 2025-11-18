@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "land.soia"
-version = "1.0.31"
+version = "1.0.32"
 
 kotlin {
     compilerOptions {
@@ -33,6 +33,7 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Configure Dokka for HTML documentation
 tasks.dokkaHtml.configure {
     outputDirectory.set(layout.buildDirectory.dir("dokka"))
 }
@@ -55,7 +56,7 @@ mavenPublishing {
     coordinates(
         groupId = "land.soia",
         artifactId = "soia-kotlin-client",
-        version = "1.0.31",
+        version = "1.0.32",
     )
 
     // Configure POM metadata for the published artifact

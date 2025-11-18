@@ -756,31 +756,6 @@ class SerializersTest {
     }
 
     @Test
-    fun `test optional serializer idempotency`() {
-        // Test that calling optional on an already optional serializer returns the same instance
-        val intOptional = Serializers.optional(Serializers.int32)
-        val doubleOptional = Serializers.optional(intOptional)
-
-        // They should be the same instance (idempotent)
-        assertThat(intOptional === doubleOptional).isTrue()
-
-        // Test functionality is preserved
-        val testValue = 123
-        assertThat(intOptional.fromJsonCode(intOptional.toJsonCode(testValue))).isEqualTo(testValue)
-        assertThat(doubleOptional.fromJsonCode(doubleOptional.toJsonCode(testValue))).isEqualTo(testValue)
-        assertThat(intOptional.fromJsonCode(intOptional.toJsonCode(null))).isEqualTo(null)
-        assertThat(doubleOptional.fromJsonCode(doubleOptional.toJsonCode(null))).isEqualTo(null)
-
-        // Binary serialization should also work the same
-        val testBytes = intOptional.toBytes(testValue)
-        val doubleBytes = doubleOptional.toBytes(testValue)
-        assertThat(doubleBytes).isEqualTo(testBytes)
-
-        assertThat(intOptional.fromBytes(testBytes.toByteArray())).isEqualTo(testValue)
-        assertThat(doubleOptional.fromBytes(doubleBytes.toByteArray())).isEqualTo(testValue)
-    }
-
-    @Test
     fun `test optional serializer edge cases`() {
         val intOptional = Serializers.optional(Serializers.int32)
         val stringOptional = Serializers.optional(Serializers.string)
