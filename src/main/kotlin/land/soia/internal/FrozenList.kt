@@ -27,7 +27,7 @@ fun <M, E, K> toKeyedList(
     getKey: (E) -> K,
     toFrozen: (M) -> E,
 ): KeyedList<E, K> {
-    return if (elements is KeyedListImpl<*, *> && elements.getKeySpec.isNotEmpty() && elements.getKey == getKey) {
+    return if (elements is KeyedListImpl<*, *> && elements.getKeySpec.isNotEmpty() && elements.getKeySpec == getKeySpec) {
         elements as KeyedList<E, K>
     } else {
         val result = KeyedListImpl(elements.map(toFrozen), getKeySpec, getKey)
@@ -86,9 +86,17 @@ private open class KeyedListImpl<E, K>(
     override val mapView: Map<K, E> by lazy {
         list.associateBy(getKey)
     }
+
+    override fun findByKey(key: K): E? {
+        return mapView[key]
+    }
 }
 
 private object FrozenEmptyList : FrozenList<Any>(emptyList()), KeyedList<Any, Any> {
     override val mapView: Map<Any, Any>
         get() = emptyMap()
+
+    override fun findByKey(key: Any): Any? {
+        return null
+    }
 }

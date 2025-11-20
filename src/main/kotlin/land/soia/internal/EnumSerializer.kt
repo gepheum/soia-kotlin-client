@@ -17,6 +17,8 @@ import okio.BufferedSource
 
 class EnumSerializer<Enum : Any> private constructor(
     recordId: String,
+    private val getKindOrdinal: (Enum) -> Int,
+    private val kindCount: Int,
     private val unknown: UnknownField<Enum>,
 ) : RecordSerializer<Enum, EnumField.Reflective<Enum>>(), EnumDescriptor.Reflective<Enum> {
     override val parsedRecordId = RecordId.parse(recordId)
@@ -25,14 +27,17 @@ class EnumSerializer<Enum : Any> private constructor(
         @Suppress("UNCHECKED_CAST")
         fun <Enum : Any, Unknown : Enum> create(
             recordId: String,
+            getKindOrdinal: (Enum) -> Int,
+            kindCount: Int,
             unknownInstance: Unknown,
             wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Unknown,
             getUnrecognized: (Unknown) -> UnrecognizedEnum<Enum>?,
         ) = EnumSerializer(
             recordId,
+            getKindOrdinal,
+            kindCount,
             unknown =
                 UnknownField(
-                    unknownInstance.javaClass,
                     unknownInstance,
                     wrapUnrecognized,
                     getUnrecognized as (Enum) -> UnrecognizedEnum<Enum>?,
@@ -43,23 +48,24 @@ class EnumSerializer<Enum : Any> private constructor(
     fun addConstantField(
         number: Int,
         name: String,
+        kindOrdinal: Int,
         instance: Enum,
     ) {
         checkNotFinalized()
-        addFieldImpl(ConstantField(number, name, instance.javaClass, instance))
+        addFieldImpl(ConstantField(number, name, kindOrdinal, instance))
     }
 
     fun <Instance : Enum, T> addWrapperField(
         number: Int,
         name: String,
-        instanceType: Class<Instance>,
+        kindOrdinal: Int,
         valueSerializer: Serializer<T>,
         wrap: (T) -> Instance,
         getValue: (Instance) -> T,
     ) {
         checkNotFinalized()
         @Suppress("UNCHECKED_CAST")
-        addFieldImpl(WrapperField(number, name, instanceType, valueSerializer, wrap, getValue as (Enum) -> T))
+        addFieldImpl(WrapperField(number, name, kindOrdinal, valueSerializer, wrap, getValue as (Enum) -> T, getKindOrdinal))
     }
 
     fun addRemovedNumber(number: Int) {
@@ -74,7 +80,7 @@ class EnumSerializer<Enum : Any> private constructor(
 
     private sealed class Field<Enum : Any> : FieldOrRemoved<Enum>() {
         abstract val name: String
-        abstract val instanceType: Class<out Enum>
+        abstract val kindOrdinal: Int
 
         abstract fun toJson(
             input: Enum,
@@ -102,11 +108,11 @@ class EnumSerializer<Enum : Any> private constructor(
     }
 
     private class UnknownField<Enum : Any>(
-        override val instanceType: Class<out Enum>,
         override val constant: Enum,
         val wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Enum,
         private val getUnrecognized: (Enum) -> UnrecognizedEnum<Enum>?,
     ) : Field<Enum>(), EnumConstantField.Reflective<Enum> {
+        override val kindOrdinal = 0
         override val number get() = 0
         override val name get() = "?"
 
@@ -147,7 +153,7 @@ class EnumSerializer<Enum : Any> private constructor(
     private class ConstantField<Enum : Any, Instance : Enum>(
         override val number: Int,
         override val name: String,
-        override val instanceType: Class<Instance>,
+        override val kindOrdinal: Int,
         override val constant: Enum,
     ) : Field<Enum>(), EnumConstantField.Reflective<Enum> {
         override fun toJson(
@@ -177,10 +183,11 @@ class EnumSerializer<Enum : Any> private constructor(
     private class WrapperField<Enum : Any, T>(
         override val number: Int,
         override val name: String,
-        override val instanceType: Class<out Enum>,
+        override val kindOrdinal: Int,
         val valueSerializer: Serializer<T>,
         val wrapFn: (T) -> Enum,
         val getValue: (Enum) -> T,
+        val getKindOrdinal: (Enum) -> Int,
     ) : Field<Enum>(), EnumWrapperField.Reflective<Enum, T> {
         override fun toJson(
             input: Enum,
@@ -230,7 +237,7 @@ class EnumSerializer<Enum : Any> private constructor(
             get() = valueSerializer.impl.typeDescriptor
 
         override fun test(e: Enum): Boolean {
-            return e.javaClass == instanceType
+            return getKindOrdinal(e) == kindOrdinal
         }
 
         override fun get(e: Enum): T = getValue(e)
@@ -265,7 +272,7 @@ class EnumSerializer<Enum : Any> private constructor(
         mutableFields.add(field.asDescriptorField())
         numberToField[field.number] = field
         nameToField[field.name] = field
-        instanceTypeToField[field.instanceType] = field
+        kindOrdinalToField[field.kindOrdinal] = field
     }
 
     fun finalizeEnum() {
@@ -284,7 +291,7 @@ class EnumSerializer<Enum : Any> private constructor(
     private val mutableRemovedNumbers = mutableSetOf<Int>()
     private val numberToField = mutableMapOf<Int, FieldOrRemoved<Enum>>()
     private val nameToField = mutableMapOf<String, Field<Enum>>()
-    private val instanceTypeToField = mutableMapOf<Class<out Enum>, Field<Enum>>()
+    private val kindOrdinalToField = MutableList<Field<Enum>?>(kindCount) { null }
     private var finalized = false
 
     override fun isDefault(value: Enum): Boolean {
@@ -295,7 +302,7 @@ class EnumSerializer<Enum : Any> private constructor(
         input: Enum,
         readableFlavor: Boolean,
     ): JsonElement {
-        val field = instanceTypeToField[input.javaClass]!!
+        val field = kindOrdinalToField[getKindOrdinal(input)]!!
         return field.toJson(input, readableFlavor = readableFlavor)
     }
 
@@ -365,7 +372,7 @@ class EnumSerializer<Enum : Any> private constructor(
         input: Enum,
         buffer: Buffer,
     ) {
-        val field = instanceTypeToField[input.javaClass]!!
+        val field = kindOrdinalToField[getKindOrdinal(input)]!!
         field.encode(input, buffer)
     }
 
@@ -433,7 +440,7 @@ class EnumSerializer<Enum : Any> private constructor(
         out: StringBuilder,
         eolIndent: String,
     ) {
-        val field = instanceTypeToField[input.javaClass]!!
+        val field = kindOrdinalToField[getKindOrdinal(input)]!!
         field.appendString(input, out, eolIndent)
     }
 
@@ -499,7 +506,7 @@ class EnumSerializer<Enum : Any> private constructor(
     }
 
     override fun getField(e: Enum): EnumField.Reflective<Enum> {
-        val field = instanceTypeToField[e.javaClass]!!
+        val field = kindOrdinalToField[getKindOrdinal(e)]!!
         return field.asDescriptorField()
     }
 

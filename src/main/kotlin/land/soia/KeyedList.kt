@@ -5,10 +5,10 @@ package land.soia
  * extracted from each element using the function passed to [toKeyedList]. Each
  * element in the list is assumed to "contain" its own key.
  *
- * @param T The type of elements in the list; contains the key
+ * @param E The type of elements in the list; contains the key
  * @param K The type of keys used for indexing
  */
-interface KeyedList<T, K> : List<T> {
+interface KeyedList<E, K> : List<E> {
     /**
      * A map that provides fast key-based access to elements in the list.
      *
@@ -17,7 +17,13 @@ interface KeyedList<T, K> : List<T> {
      *
      * If multiple elements have the same key, only the last one is added to the map.
      */
-    val mapView: Map<K, T>
+    val mapView: Map<K, E>
+
+    /**
+     * Returns the last element associated with the specified key.
+     * Returns null if the key is not present.
+     */
+    fun findByKey(key: K): E?
 
     companion object {
         /**
@@ -29,10 +35,10 @@ interface KeyedList<T, K> : List<T> {
          * @return A new KeyedList containing the elements with key-based indexing
          */
         @JvmStatic
-        fun <T, K> toKeyedList(
-            elements: Iterable<T>,
-            getKey: (T) -> K,
-        ): KeyedList<T, K> {
+        fun <E, K> toKeyedList(
+            elements: Iterable<E>,
+            getKey: (E) -> K,
+        ): KeyedList<E, K> {
             return land.soia.internal.toKeyedList(elements, "", getKey) { it }
         }
     }

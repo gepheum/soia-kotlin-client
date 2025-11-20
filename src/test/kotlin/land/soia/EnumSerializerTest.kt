@@ -16,15 +16,27 @@ import org.junit.jupiter.api.Test
 class EnumSerializerTest {
     // Test enum types
     sealed class Color {
-        data class Unknown(val unrecognized: UnrecognizedEnum<Color>?) : Color()
+        abstract val kindOrdinal: Int
 
-        object RED : Color()
+        data class Unknown(val unrecognized: UnrecognizedEnum<Color>?) : Color() {
+            override val kindOrdinal = 0
+        }
 
-        object GREEN : Color()
+        object RED : Color() {
+            override val kindOrdinal = 1
+        }
 
-        object BLUE : Color()
+        object GREEN : Color() {
+            override val kindOrdinal = 2
+        }
 
-        data class CustomOption(val rgb: Int) : Color()
+        object BLUE : Color() {
+            override val kindOrdinal = 3
+        }
+
+        data class CustomOption(val rgb: Int) : Color() {
+            override val kindOrdinal = 4
+        }
 
         companion object {
             val UNKNOWN = Unknown(null)
@@ -32,29 +44,43 @@ class EnumSerializerTest {
     }
 
     sealed class Status {
-        data class Unknown(val unrecognized: UnrecognizedEnum<Status>) : Status()
+        abstract val kindOrdinal: Int
 
-        object ACTIVE : Status()
+        data class Unknown(val unrecognized: UnrecognizedEnum<Status>) : Status() {
+            override val kindOrdinal = 0
+        }
 
-        object INACTIVE : Status()
+        object ACTIVE : Status() {
+            override val kindOrdinal = 1
+        }
 
-        data class PendingOption(val reason: String) : Status()
+        object INACTIVE : Status() {
+            override val kindOrdinal = 2
+        }
 
-        data class ErrorOption(val message: String) : Status()
+        data class PendingOption(val reason: String) : Status() {
+            override val kindOrdinal = 3
+        }
+
+        data class ErrorOption(val message: String) : Status() {
+            override val kindOrdinal = 4
+        }
     }
 
     // Simple enum with only constants
     private val colorEnumSerializer =
         EnumSerializer.create<Color, Color.Unknown>(
             "foo.bar:Color",
+            { it.kindOrdinal },
+            5,
             Color.UNKNOWN,
             { unrecognized -> Color.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
         ).apply {
-            addConstantField(1, "red", Color.RED)
-            addConstantField(2, "green", Color.GREEN)
-            addConstantField(3, "blue", Color.BLUE)
-            addWrapperField(4, "custom", Color.CustomOption::class.java, Serializers.int32, { Color.CustomOption(it) }, { it.rgb })
+            addConstantField(1, "red", 1, Color.RED)
+            addConstantField(2, "green", 2, Color.GREEN)
+            addConstantField(3, "blue", 3, Color.BLUE)
+            addWrapperField(4, "custom", 4, Serializers.int32, { Color.CustomOption(it) }, { it.rgb })
             finalizeEnum()
         }
 
@@ -62,13 +88,15 @@ class EnumSerializerTest {
     private val statusEnumSerializer =
         EnumSerializer.create<Status, Status.Unknown>(
             "foo.bar:Color.Status",
+            { it.kindOrdinal },
+            4,
             Status.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
             { unrecognized -> Status.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
         ).apply {
-            addConstantField(1, "active", Status.ACTIVE)
-            addConstantField(2, "inactive", Status.INACTIVE)
-            addWrapperField(3, "pending", Status.PendingOption::class.java, Serializers.string, { Status.PendingOption(it) }, { it.reason })
+            addConstantField(1, "active", 1, Status.ACTIVE)
+            addConstantField(2, "inactive", 2, Status.INACTIVE)
+            addWrapperField(3, "pending", 3, Serializers.string, { Status.PendingOption(it) }, { it.reason })
             addRemovedNumber(4) // Removed field number
             finalizeEnum()
         }
@@ -321,18 +349,20 @@ class EnumSerializerTest {
         val testEnumSerializer =
             EnumSerializer.create<Color, Color.Unknown>(
                 "foo.bar:Color",
+                { it.kindOrdinal },
+                4,
                 Color.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
                 { unrecognized -> Color.Unknown(unrecognized) },
                 { enum -> enum.unrecognized },
             )
 
-        testEnumSerializer.addConstantField(1, "test", Color.RED)
+        testEnumSerializer.addConstantField(1, "test", 1, Color.RED)
         testEnumSerializer.finalizeEnum()
 
         // Adding fields after finalization should throw
         var exceptionThrown = false
         try {
-            testEnumSerializer.addConstantField(2, "test2", Color.GREEN)
+            testEnumSerializer.addConstantField(2, "test2", 2, Color.GREEN)
         } catch (e: IllegalStateException) {
             exceptionThrown = true
         }
