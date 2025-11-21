@@ -51,6 +51,14 @@ object Serializers {
     @get:JvmName("uint64")
     val uint64: Serializer<ULong> = Serializer(Uint64Serializer)
 
+    /**
+     * Serializer for 64-bit unsigned integers, represented as `long` values on the
+     * Java side.
+     */
+    @JvmStatic
+    @get:JvmName("javaUint64")
+    val javaUint64: Serializer<Long> = Serializer(JavaUint64Serializer)
+
     /** Serializer for 32-bit floating-point numbers. */
     @JvmStatic
     @get:JvmName("float32")
@@ -355,6 +363,52 @@ private object Uint64Serializer : PrimitiveSerializer<ULong>(), PrimitiveDescrip
         eolIndent: String,
     ) {
         out.append(input).append("UL")
+    }
+
+    override val typeName get() = "uint64"
+    override val primitiveType get() = PrimitiveType.UINT_64
+    override val typeDescriptor get() = this
+}
+
+private object JavaUint64Serializer : PrimitiveSerializer<Long>(), PrimitiveDescriptor {
+    override fun isDefault(value: Long): Boolean {
+        return value == 0L
+    }
+
+    override fun encode(
+        input: Long,
+        buffer: Buffer,
+    ) {
+        return Uint64Serializer.encode(input.toULong(), buffer)
+    }
+
+    override fun decode(
+        buffer: BufferedSource,
+        keepUnrecognizedFields: Boolean,
+    ): Long {
+        return decodeNumber(buffer).toLong()
+    }
+
+    override fun toJson(
+        input: Long,
+        readableFlavor: Boolean,
+    ): JsonElement {
+        return Uint64Serializer.toJson(input.toULong(), readableFlavor)
+    }
+
+    override fun fromJson(
+        json: JsonElement,
+        keepUnrecognizedFields: Boolean,
+    ): Long {
+        return Uint64Serializer.fromJson(json, keepUnrecognizedFields).toLong()
+    }
+
+    override fun appendString(
+        input: Long,
+        out: StringBuilder,
+        eolIndent: String,
+    ) {
+        out.append(input.toULong()).append("UL")
     }
 
     override val typeName get() = "uint64"
