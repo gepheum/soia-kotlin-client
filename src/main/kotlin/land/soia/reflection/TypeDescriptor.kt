@@ -8,10 +8,33 @@ import kotlinx.serialization.json.JsonPrimitive
 import land.soia.formatReadableJson
 import land.soia.internal.RecordId
 
-interface TypeDescriptorBase
+interface TypeDescriptorBase {
+    /**
+     * Returns the stringified JSON representation of this type descriptor.
+     *
+     * @return A pretty-printed JSON string describing the type
+     */
+    fun asJsonCode(): String
+
+    /**
+     * Returns the JSON representation of this type descriptor.
+     * If you just need the stringified JSON, call [asJsonCode] instead.
+     *
+     * @return A JsonObject describing the type
+     */
+    fun asJson(): JsonElement
+}
 
 /** Describes a Soia type. */
 sealed interface TypeDescriptor : TypeDescriptorBase {
+    override fun asJsonCode(): String {
+        return asJsonCodeImpl(this)
+    }
+
+    override fun asJson(): JsonElement {
+        return asJsonImpl(this)
+    }
+
     companion object {
         /**
          * Parses a type descriptor from its JSON string representation, as returned by
@@ -32,7 +55,18 @@ sealed interface TypeDescriptor : TypeDescriptorBase {
     }
 
     /** Adds runtime introspection capabilities to a [TypeDescriptor]. */
-    sealed interface Reflective : TypeDescriptorBase
+    sealed interface Reflective : TypeDescriptorBase {
+        override fun asJsonCode(): String {
+            return asJsonCodeImpl(notReflective)
+        }
+
+        override fun asJson(): JsonElement {
+            return asJsonImpl(notReflective)
+        }
+
+        /** A non-descriptive descriptor equivalent to this reflective descriptor. */
+        val notReflective: TypeDescriptor get() = notReflectiveImpl(this)
+    }
 }
 
 /** Enumeration of all primitive types supported by Soia. */
@@ -67,6 +101,14 @@ enum class PrimitiveType {
 
 /** Describes a primitive type such as integers, strings, booleans, etc. */
 interface PrimitiveDescriptor : TypeDescriptor, TypeDescriptor.Reflective {
+    override fun asJsonCode(): String {
+        return asJsonCodeImpl(this)
+    }
+
+    override fun asJson(): JsonElement {
+        return asJsonImpl(this)
+    }
+
     /** The specific primitive type being described. */
     val primitiveType: PrimitiveType
 }
@@ -333,41 +375,41 @@ class EnumDescriptor internal constructor(
     }
 }
 
-fun TypeDescriptor.Reflective.notReflective(): TypeDescriptor {
-    return when (this) {
-        is PrimitiveDescriptor -> this
+private fun notReflectiveImpl(descriptor: TypeDescriptor.Reflective): TypeDescriptor {
+    return when (descriptor) {
+        is PrimitiveDescriptor -> descriptor
         is OptionalDescriptor.Reflective ->
             OptionalDescriptor(
-                otherType = this.otherType.notReflective(),
+                otherType = notReflectiveImpl(descriptor.otherType),
             )
         is ArrayDescriptor.Reflective ->
             ArrayDescriptor(
-                itemType = this.itemType.notReflective(),
-                keyProperty = this.keyProperty,
+                itemType = notReflectiveImpl(descriptor.itemType),
+                keyProperty = descriptor.keyProperty,
             )
         is StructDescriptor.Reflective<*, *> ->
             StructDescriptor(
-                recordId = RecordId.parse(this.recordId()),
+                recordId = RecordId.parse(descriptor.recordId()),
                 fields =
-                    this.fields.map {
+                    descriptor.fields.map {
                         StructField(
                             name = it.name,
                             number = it.number,
-                            type = it.type.notReflective(),
+                            type = notReflectiveImpl(it.type),
                         )
                     },
-                removedNumbers = this.removedNumbers,
+                removedNumbers = descriptor.removedNumbers,
             )
         is EnumDescriptor.Reflective<*> ->
             EnumDescriptor(
-                recordId = RecordId.parse(this.recordId()),
+                recordId = RecordId.parse(descriptor.recordId()),
                 fields =
-                    this.fields.map {
+                    descriptor.fields.map {
                         if (it is EnumWrapperField.Reflective<*, *>) {
                             EnumWrapperField(
                                 name = it.name,
                                 number = it.number,
-                                type = it.type.notReflective(),
+                                type = notReflectiveImpl(it.type),
                             )
                         } else {
                             EnumConstantField(
@@ -376,54 +418,24 @@ fun TypeDescriptor.Reflective.notReflective(): TypeDescriptor {
                             )
                         }
                     },
-                removedNumbers = this.removedNumbers,
+                removedNumbers = descriptor.removedNumbers,
             )
     }
 }
 
-/**
- * Returns the stringified JSON representation of this type descriptor.
- *
- * @return A pretty-printed JSON string describing the type
- */
-fun TypeDescriptor.asJsonCode(): String {
-    return formatReadableJson(asJson())
+private fun asJsonCodeImpl(descriptor: TypeDescriptor): String {
+    return formatReadableJson(asJsonImpl(descriptor))
 }
 
-/**
- * Returns the JSON representation of this type descriptor.
- * If you just need the stringified JSON, call [asJsonCode] instead.
- *
- * @return A JsonObject describing the type
- */
-fun TypeDescriptor.asJson(): JsonObject {
+private fun asJsonImpl(descriptor: TypeDescriptor): JsonObject {
     val recordIdToDefinition = mutableMapOf<String, JsonObject>()
-    addRecordDefinitions(this, recordIdToDefinition)
+    addRecordDefinitions(descriptor, recordIdToDefinition)
     return JsonObject(
         mapOf(
-            "type" to getTypeSignature(this),
+            "type" to getTypeSignature(descriptor),
             "records" to JsonArray(recordIdToDefinition.values.toList()),
         ),
     )
-}
-
-/**
- * Returns the stringified JSON representation of this type descriptor.
- *
- * @return A pretty-printed JSON string describing the type
- */
-fun TypeDescriptor.Reflective.asJsonCode(): String {
-    return this.notReflective().asJsonCode()
-}
-
-/**
- * Returns the JSON representation of this type descriptor.
- * If you just need the stringified JSON, call [asJsonCode] instead.
- *
- * @return A JsonObject describing the type
- */
-fun TypeDescriptor.Reflective.asJson(): JsonObject {
-    return this.notReflective().asJson()
 }
 
 private fun getTypeSignature(typeDescriptor: TypeDescriptor): JsonObject {

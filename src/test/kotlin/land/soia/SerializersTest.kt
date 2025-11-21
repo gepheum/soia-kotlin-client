@@ -11,8 +11,6 @@ import land.soia.reflection.PrimitiveDescriptor
 import land.soia.reflection.RecordDescriptor
 import land.soia.reflection.StructDescriptor
 import land.soia.reflection.TypeDescriptor
-import land.soia.reflection.asJson
-import land.soia.reflection.asJsonCode
 import land.soia.reflection.parseTypeDescriptorImpl
 import okio.ByteString
 import okio.ByteString.Companion.decodeHex

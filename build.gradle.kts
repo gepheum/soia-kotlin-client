@@ -8,11 +8,10 @@ plugins {
 }
 
 group = "land.soia"
-version = "1.0.37"
+version = "1.0.38"
 
 kotlin {
     compilerOptions {
-        // Removed unsupported flag
     }
 }
 
@@ -56,7 +55,7 @@ mavenPublishing {
     coordinates(
         groupId = "land.soia",
         artifactId = "soia-kotlin-client",
-        version = "1.0.37",
+        version = "1.0.38",
     )
 
     // Configure POM metadata for the published artifact
