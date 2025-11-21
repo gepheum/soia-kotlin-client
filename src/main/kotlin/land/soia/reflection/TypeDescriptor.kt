@@ -524,7 +524,7 @@ private fun addRecordDefinitions(
         is StructDescriptor -> {
             val recordId = typeDescriptor.recordId()
             if (recordIdToDefinition.containsKey(recordId)) {
-                return;
+                return
             }
             val fields =
                 typeDescriptor.fields.map {
@@ -554,7 +554,7 @@ private fun addRecordDefinitions(
         is EnumDescriptor -> {
             val recordId = typeDescriptor.recordId()
             if (recordIdToDefinition.containsKey(recordId)) {
-                return;
+                return
             }
             val fields =
                 typeDescriptor.fields.map {
