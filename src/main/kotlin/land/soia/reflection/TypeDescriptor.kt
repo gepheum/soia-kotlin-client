@@ -65,7 +65,7 @@ sealed interface TypeDescriptor : TypeDescriptorBase {
         }
 
         /** A non-descriptive descriptor equivalent to this reflective descriptor. */
-        val notReflective: TypeDescriptor get() = notReflectiveImpl(this)
+        val notReflective: TypeDescriptor get() = notReflectiveImpl(this, mutableMapOf())
     }
 }
 
@@ -375,51 +375,68 @@ class EnumDescriptor internal constructor(
     }
 }
 
-private fun notReflectiveImpl(descriptor: TypeDescriptor.Reflective): TypeDescriptor {
+private fun notReflectiveImpl(
+    descriptor: TypeDescriptor.Reflective,
+    inProgress: MutableMap<TypeDescriptor.Reflective, TypeDescriptor>,
+): TypeDescriptor {
+    run {
+        val inProgressResult = inProgress[descriptor]
+        if (inProgressResult != null) {
+            return inProgressResult
+        }
+    }
     return when (descriptor) {
         is PrimitiveDescriptor -> descriptor
         is OptionalDescriptor.Reflective ->
             OptionalDescriptor(
-                otherType = notReflectiveImpl(descriptor.otherType),
+                otherType = notReflectiveImpl(descriptor.otherType, inProgress),
             )
         is ArrayDescriptor.Reflective ->
             ArrayDescriptor(
-                itemType = notReflectiveImpl(descriptor.itemType),
+                itemType = notReflectiveImpl(descriptor.itemType, inProgress),
                 keyProperty = descriptor.keyProperty,
             )
-        is StructDescriptor.Reflective<*, *> ->
-            StructDescriptor(
-                recordId = RecordId.parse(descriptor.recordId()),
-                fields =
-                    descriptor.fields.map {
-                        StructField(
+        is StructDescriptor.Reflective<*, *> -> {
+            val result =
+                StructDescriptor(
+                    recordId = RecordId.parse(descriptor.recordId()),
+                    removedNumbers = descriptor.removedNumbers,
+                )
+            inProgress[descriptor] = result
+            result.fields =
+                descriptor.fields.map {
+                    StructField(
+                        name = it.name,
+                        number = it.number,
+                        type = notReflectiveImpl(it.type, inProgress),
+                    )
+                }
+            result
+        }
+        is EnumDescriptor.Reflective<*> -> {
+            val result =
+                EnumDescriptor(
+                    recordId = RecordId.parse(descriptor.recordId()),
+                    removedNumbers = descriptor.removedNumbers,
+                )
+            inProgress[descriptor] = result
+            result.fields =
+                descriptor.fields.map {
+                    if (it is EnumWrapperField.Reflective<*, *>) {
+                        EnumWrapperField(
                             name = it.name,
                             number = it.number,
-                            type = notReflectiveImpl(it.type),
+                            type = notReflectiveImpl(it.type, inProgress),
                         )
-                    },
-                removedNumbers = descriptor.removedNumbers,
-            )
-        is EnumDescriptor.Reflective<*> ->
-            EnumDescriptor(
-                recordId = RecordId.parse(descriptor.recordId()),
-                fields =
-                    descriptor.fields.map {
-                        if (it is EnumWrapperField.Reflective<*, *>) {
-                            EnumWrapperField(
-                                name = it.name,
-                                number = it.number,
-                                type = notReflectiveImpl(it.type),
-                            )
-                        } else {
-                            EnumConstantField(
-                                name = it.name,
-                                number = it.number,
-                            )
-                        }
-                    },
-                removedNumbers = descriptor.removedNumbers,
-            )
+                    } else {
+                        EnumConstantField(
+                            name = it.name,
+                            number = it.number,
+                        )
+                    }
+                }
+            result
+        }
     }
 }
 
