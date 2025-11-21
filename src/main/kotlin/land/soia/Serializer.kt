@@ -3,6 +3,8 @@ package land.soia
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import land.soia.internal.SerializerImpl
+import land.soia.reflection.EnumDescriptor
+import land.soia.reflection.StructDescriptor
 import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.ByteString
@@ -58,7 +60,7 @@ enum class UnrecognizedFieldsPolicy {
  * @param T The type of objects this serializer can handle
  * @property typeDescriptor
  */
-class Serializer<T> internal constructor(
+open class Serializer<T> internal constructor(
     internal val impl: SerializerImpl<T>,
 ) {
     /**
@@ -269,6 +271,15 @@ class Serializer<T> internal constructor(
      * includes field names types, and other metadata useful for introspection and
      * tooling.
      */
-    @get:JvmName("typeDescriptor")
-    val typeDescriptor: TypeDescriptor.Reflective = impl.typeDescriptor
+    open val typeDescriptor: TypeDescriptor.Reflective = impl.typeDescriptor
 }
+
+class StructSerializer<T> internal constructor(
+    impl: SerializerImpl<T>,
+    override val typeDescriptor: StructDescriptor.Reflective<T, *>,
+) : Serializer<T>(impl)
+
+class EnumSerializer<T> internal constructor(
+    impl: SerializerImpl<T>,
+    override val typeDescriptor: EnumDescriptor.Reflective<T>,
+) : Serializer<T>(impl)
