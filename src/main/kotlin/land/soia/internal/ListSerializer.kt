@@ -27,7 +27,7 @@ fun <E, K> keyedListSerializer(
 
 private abstract class AbstractListSerializer<E, L : List<E>>(
     val item: SerializerImpl<E>,
-) : SerializerImpl<L>(), ArrayDescriptor.Reflective {
+) : SerializerImpl<L>(), ArrayDescriptor.Reflective<E, L> {
     final override fun isDefault(value: L): Boolean {
         return value.isEmpty()
     }
@@ -119,7 +119,7 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
 
     abstract fun toList(list: List<E>): L
 
-    final override val itemType: TypeDescriptor.Reflective
+    final override val itemType: TypeDescriptor.Reflective<E>
         get() = item.typeDescriptor
 
     final override val typeSignature: JsonElement

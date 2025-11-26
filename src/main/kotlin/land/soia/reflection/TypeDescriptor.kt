@@ -55,7 +55,7 @@ sealed interface TypeDescriptor : TypeDescriptorBase {
     }
 
     /** Adds runtime introspection capabilities to a [TypeDescriptor]. */
-    sealed interface Reflective : TypeDescriptorBase {
+    sealed interface Reflective<T> : TypeDescriptorBase {
         override fun asJsonCode(): String {
             return asJsonCodeImpl(notReflective)
         }
@@ -99,18 +99,25 @@ enum class PrimitiveType {
     BYTES,
 }
 
-/** Describes a primitive type such as integers, strings, booleans, etc. */
-interface PrimitiveDescriptor : TypeDescriptor, TypeDescriptor.Reflective {
-    override fun asJsonCode(): String {
-        return asJsonCodeImpl(this)
-    }
-
-    override fun asJson(): JsonElement {
-        return asJsonImpl(this)
-    }
-
+/**
+ * Base interface for primitive type descriptors.
+ */
+interface PrimitiveDescriptorBase : TypeDescriptorBase {
     /** The specific primitive type being described. */
     val primitiveType: PrimitiveType
+}
+
+/** Describes a primitive type such as integers, strings, booleans, etc. */
+class PrimitiveDescriptor private constructor(override val primitiveType: PrimitiveType) : PrimitiveDescriptorBase, TypeDescriptor {
+    interface Reflective<T> : PrimitiveDescriptorBase, TypeDescriptor.Reflective<T>
+
+    companion object {
+        private val instances = PrimitiveType.entries.map { PrimitiveDescriptor(it) }.toList()
+
+        internal fun getInstance(primitiveType: PrimitiveType): PrimitiveDescriptor {
+            return instances[primitiveType.ordinal]
+        }
+    }
 }
 
 /**
@@ -129,8 +136,19 @@ interface OptionalDescriptorBase<OtherType : TypeDescriptorBase> : TypeDescripto
 class OptionalDescriptor internal constructor(
     override val otherType: TypeDescriptor,
 ) : OptionalDescriptorBase<TypeDescriptor>, TypeDescriptor {
-    /** Adds runtime introspection capabilities to an [OptionalDescriptor]. */
-    interface Reflective : OptionalDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
+    /**
+     * Adds runtime introspection capabilities to an [OptionalDescriptor].
+     * The value type on the JVM side is `T?`.
+     * Preferred in Kotlin over [OptionalDescriptor.JavaReflective].
+     */
+    interface Reflective<T> : OptionalDescriptorBase<TypeDescriptor.Reflective<*>>, TypeDescriptor.Reflective<T?>
+
+    /**
+     * Adds runtime introspection capabilities to an [OptionalDescriptor].
+     * The value type on the JVM side is `java.util.Optional<T>`.
+     * Preferred in Java over [OptionalDescriptor.Reflective].
+     */
+    interface JavaReflective<T> : OptionalDescriptorBase<TypeDescriptor.Reflective<*>>, TypeDescriptor.Reflective<java.util.Optional<T>>
 }
 
 interface ArrayDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptorBase {
@@ -149,7 +167,7 @@ class ArrayDescriptor internal constructor(
     override val keyProperty: String?,
 ) : ArrayDescriptorBase<TypeDescriptor>, TypeDescriptor {
     /** Adds runtime introspection capabilities to a [ArrayDescriptor]. */
-    interface Reflective : ArrayDescriptorBase<TypeDescriptor.Reflective>, TypeDescriptor.Reflective
+    interface Reflective<E, L : List<E>> : ArrayDescriptorBase<TypeDescriptor.Reflective<*>>, TypeDescriptor.Reflective<L>
 }
 
 interface FieldBase {
@@ -221,7 +239,7 @@ sealed class RecordDescriptor<Field : FieldBase> : RecordDescriptorBase<Field>, 
     }
 
     /** Adds runtime introspection capabilities to a [RecordDescriptor]. */
-    sealed interface Reflective<Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor.Reflective
+    sealed interface Reflective<T, Field : FieldBase> : RecordDescriptorBase<Field>, TypeDescriptor.Reflective<T>
 }
 
 interface StructFieldBase<TypeDescriptor : TypeDescriptorBase> : FieldBase {
@@ -237,7 +255,7 @@ class StructField internal constructor(
     override val type: TypeDescriptor,
 ) : StructFieldBase<TypeDescriptor> {
     /** Adds runtime introspection capabilities to a [StructField]. */
-    interface Reflective<Frozen, Mutable, Value> : StructFieldBase<TypeDescriptor.Reflective> {
+    interface Reflective<Frozen, Mutable, Value> : StructFieldBase<TypeDescriptor.Reflective<*>> {
         /** Extracts the value of the field from the given struct. */
         fun get(struct: Frozen): Value
 
@@ -276,7 +294,7 @@ class StructDescriptor internal constructor(
     /** Adds runtime introspection capabilities to a [StructDescriptor]. */
     interface Reflective<Frozen, Mutable> :
         StructDescriptorBase<StructField.Reflective<Frozen, Mutable, *>>,
-        RecordDescriptor.Reflective<StructField.Reflective<Frozen, Mutable, *>> {
+        RecordDescriptor.Reflective<Frozen, StructField.Reflective<Frozen, Mutable, *>> {
         /**
          * Returns a new instance of the generated mutable class for a struct.
          * Performs a shallow copy of `initializer` if `initializer` is specified.
@@ -326,7 +344,7 @@ class EnumWrapperField internal constructor(
      * @param Enum The enum type
      * @param Value The type of the associated value
      */
-    interface Reflective<Enum, Value> : EnumWrapperFieldBase<TypeDescriptor.Reflective>, EnumField.Reflective<Enum> {
+    interface Reflective<Enum, Value> : EnumWrapperFieldBase<TypeDescriptor.Reflective<*>>, EnumField.Reflective<Enum> {
         /** Returns whether the given enum instance if it matches this enum field. */
         fun test(e: Enum): Boolean
 
@@ -369,15 +387,17 @@ class EnumDescriptor internal constructor(
      *
      * @param Enum The enum type
      */
-    interface Reflective<Enum> : EnumDescriptorBase<EnumField.Reflective<Enum>>, RecordDescriptor.Reflective<EnumField.Reflective<Enum>> {
+    interface Reflective<Enum> :
+        EnumDescriptorBase<EnumField.Reflective<Enum>>,
+        RecordDescriptor.Reflective<Enum, EnumField.Reflective<Enum>> {
         /** Looks up the field corresponding to the given instance of Enum. */
         fun getField(e: Enum): EnumField.Reflective<Enum>
     }
 }
 
 private fun notReflectiveImpl(
-    descriptor: TypeDescriptor.Reflective,
-    inProgress: MutableMap<TypeDescriptor.Reflective, TypeDescriptor>,
+    descriptor: TypeDescriptor.Reflective<*>,
+    inProgress: MutableMap<TypeDescriptor.Reflective<*>, TypeDescriptor>,
 ): TypeDescriptor {
     run {
         val inProgressResult = inProgress[descriptor]
@@ -386,12 +406,16 @@ private fun notReflectiveImpl(
         }
     }
     return when (descriptor) {
-        is PrimitiveDescriptor -> descriptor
-        is OptionalDescriptor.Reflective ->
+        is PrimitiveDescriptor.Reflective -> PrimitiveDescriptor.getInstance(descriptor.primitiveType)
+        is OptionalDescriptor.Reflective<*> ->
             OptionalDescriptor(
                 otherType = notReflectiveImpl(descriptor.otherType, inProgress),
             )
-        is ArrayDescriptor.Reflective ->
+        is OptionalDescriptor.JavaReflective<*> ->
+            OptionalDescriptor(
+                otherType = notReflectiveImpl(descriptor.otherType, inProgress),
+            )
+        is ArrayDescriptor.Reflective<*, *> ->
             ArrayDescriptor(
                 itemType = notReflectiveImpl(descriptor.itemType, inProgress),
                 keyProperty = descriptor.keyProperty,

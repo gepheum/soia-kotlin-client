@@ -101,7 +101,7 @@ class EnumSerializer<Enum : Any> private constructor(
         fun asDescriptorField(): EnumField.Reflective<Enum> {
             return when (this) {
                 is UnknownField<Enum> -> this
-                is ConstantField<Enum, *> -> this
+                is ConstantField<Enum> -> this
                 is WrapperField<Enum, *> -> this
             }
         }
@@ -150,7 +150,7 @@ class EnumSerializer<Enum : Any> private constructor(
         }
     }
 
-    private class ConstantField<Enum : Any, Instance : Enum>(
+    private class ConstantField<Enum : Any>(
         override val number: Int,
         override val name: String,
         override val kindOrdinal: Int,
@@ -233,7 +233,7 @@ class EnumSerializer<Enum : Any> private constructor(
             out.append(eolIndent).append(')')
         }
 
-        override val type: TypeDescriptor.Reflective
+        override val type: TypeDescriptor.Reflective<*>
             get() = valueSerializer.impl.typeDescriptor
 
         override fun test(e: Enum): Boolean {
@@ -321,7 +321,7 @@ class EnumSerializer<Enum : Any> private constructor(
                     }
                 when (field) {
                     is UnknownField<Enum> -> unknown.constant
-                    is ConstantField<Enum, *> -> field.constant
+                    is ConstantField<Enum> -> field.constant
                     is RemovedNumber<Enum> -> unknown.constant
                     is WrapperField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a wrapper field")
                     null ->
@@ -342,7 +342,7 @@ class EnumSerializer<Enum : Any> private constructor(
                         nameToField[first.content]
                     }
                 return when (field) {
-                    is UnknownField<Enum>, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
+                    is UnknownField<Enum>, is ConstantField<Enum> -> throw IllegalArgumentException("$number refers to a constant field")
                     is RemovedNumber<Enum> -> unknown.constant
                     is WrapperField<Enum, *> -> {
                         val second = json[1]
@@ -360,7 +360,7 @@ class EnumSerializer<Enum : Any> private constructor(
                 val name = json["kind"]!!.jsonPrimitive.content
                 val value = json["value"]!!
                 return when (val field = nameToField[name]) {
-                    is UnknownField<Enum>, is ConstantField<Enum, *> -> throw IllegalArgumentException("$name refers to a constant field")
+                    is UnknownField<Enum>, is ConstantField<Enum> -> throw IllegalArgumentException("$name refers to a constant field")
                     is WrapperField<Enum, *> -> WrapperField.wrapFromJson(field, value)
                     null -> unknown.constant
                 }
@@ -387,7 +387,7 @@ class EnumSerializer<Enum : Any> private constructor(
             return when (val field = numberToField[number]) {
                 is RemovedNumber -> unknown.constant
                 is UnknownField -> unknown.constant
-                is ConstantField<Enum, *> -> field.constant
+                is ConstantField<Enum> -> field.constant
                 is WrapperField<Enum, *> -> throw IllegalArgumentException("${field.number} refers to a wrapper field")
                 null -> {
                     if (keepUnrecognizedFields) {
@@ -406,7 +406,7 @@ class EnumSerializer<Enum : Any> private constructor(
                     decodeUnused(buffer)
                     unknown.constant
                 }
-                is UnknownField, is ConstantField<Enum, *> -> throw IllegalArgumentException("$number refers to a constant field")
+                is UnknownField, is ConstantField<Enum> -> throw IllegalArgumentException("$number refers to a constant field")
                 is WrapperField<Enum, *> ->
                     WrapperField.wrapDecoded(
                         field,
@@ -415,7 +415,7 @@ class EnumSerializer<Enum : Any> private constructor(
                     )
                 null -> {
                     if (keepUnrecognizedFields) {
-                        val unrecognizedBytes = okio.Buffer()
+                        val unrecognizedBytes = Buffer()
                         if (number in 1..4) {
                             unrecognizedBytes.writeByte(wire + 250)
                         } else {
@@ -465,7 +465,7 @@ class EnumSerializer<Enum : Any> private constructor(
                 .map {
                     when (it) {
                         is UnknownField -> null
-                        is ConstantField<Enum, *> -> {
+                        is ConstantField<Enum> -> {
                             JsonObject(
                                 mapOf(
                                     "name" to JsonPrimitive(it.name),

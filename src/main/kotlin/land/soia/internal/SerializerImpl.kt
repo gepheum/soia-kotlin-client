@@ -35,7 +35,7 @@ abstract class SerializerImpl<T> : TypeDescriptorBase {
         eolIndent: String,
     )
 
-    internal abstract val typeDescriptor: TypeDescriptor.Reflective
+    internal abstract val typeDescriptor: TypeDescriptor.Reflective<T>
 
     internal abstract val typeSignature: JsonElement
 

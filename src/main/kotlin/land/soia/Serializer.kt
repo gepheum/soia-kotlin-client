@@ -270,5 +270,5 @@ class Serializer<T> internal constructor(
      * tooling.
      */
     @get:JvmName("typeDescriptor")
-    val typeDescriptor: TypeDescriptor.Reflective = impl.typeDescriptor
+    val typeDescriptor: TypeDescriptor.Reflective<T> = impl.typeDescriptor
 }

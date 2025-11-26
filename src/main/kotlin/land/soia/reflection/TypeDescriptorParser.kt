@@ -6,6 +6,7 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import land.soia.Serializers
 import land.soia.internal.RecordId
 
 /**
@@ -84,10 +85,6 @@ private fun parseRecordDescriptorPartial(json: JsonObject): RecordDescriptor<*> 
     }
 }
 
-private data class PrimitiveDescriptorImpl(
-    override val primitiveType: PrimitiveType,
-) : PrimitiveDescriptor
-
 private fun parseTypeDescriptorImpl(
     typeSignature: JsonElement,
     recordIdToBundle: Map<String, RecordBundle>,
@@ -98,15 +95,15 @@ private fun parseTypeDescriptorImpl(
     return when (kind) {
         "primitive" ->
             when (value.jsonPrimitive.content) {
-                "bool" -> PrimitiveDescriptorImpl(PrimitiveType.BOOL)
-                "int32" -> PrimitiveDescriptorImpl(PrimitiveType.INT_32)
-                "int64" -> PrimitiveDescriptorImpl(PrimitiveType.INT_64)
-                "uint64" -> PrimitiveDescriptorImpl(PrimitiveType.UINT_64)
-                "float32" -> PrimitiveDescriptorImpl(PrimitiveType.FLOAT_32)
-                "float64" -> PrimitiveDescriptorImpl(PrimitiveType.FLOAT_64)
-                "timestamp" -> PrimitiveDescriptorImpl(PrimitiveType.TIMESTAMP)
-                "string" -> PrimitiveDescriptorImpl(PrimitiveType.STRING)
-                "bytes" -> PrimitiveDescriptorImpl(PrimitiveType.BYTES)
+                "bool" -> Serializers.bool.typeDescriptor.notReflective
+                "int32" -> Serializers.int32.typeDescriptor.notReflective
+                "int64" -> Serializers.int64.typeDescriptor.notReflective
+                "uint64" -> Serializers.uint64.typeDescriptor.notReflective
+                "float32" -> Serializers.float32.typeDescriptor.notReflective
+                "float64" -> Serializers.float64.typeDescriptor.notReflective
+                "timestamp" -> Serializers.timestamp.typeDescriptor.notReflective
+                "string" -> Serializers.string.typeDescriptor.notReflective
+                "bytes" -> Serializers.bytes.typeDescriptor.notReflective
                 else -> throw IllegalArgumentException("unknown primitive: $kind")
             }
         "optional" -> OptionalDescriptor(parseTypeDescriptorImpl(value, recordIdToBundle))

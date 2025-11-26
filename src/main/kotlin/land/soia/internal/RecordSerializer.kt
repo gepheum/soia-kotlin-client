@@ -15,7 +15,7 @@ sealed class RecordSerializer<T, Field : FieldBase> : SerializerImpl<T>(), Recor
 
     internal abstract fun dependencies(): List<SerializerImpl<*>>
 
-    abstract override val typeDescriptor: RecordDescriptor.Reflective<Field>
+    abstract override val typeDescriptor: RecordDescriptor.Reflective<T, Field>
 
     final override val name: String
         get() = parsedRecordId.name

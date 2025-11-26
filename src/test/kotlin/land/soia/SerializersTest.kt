@@ -1369,21 +1369,24 @@ class SerializersTest {
     @Test
     fun `test TypeDescriptor type hierarchy`() {
         when (Serializers.bool.typeDescriptor) {
-            is PrimitiveDescriptor -> {}
-            is OptionalDescriptor.Reflective -> {}
-            is ArrayDescriptor.Reflective -> {}
-            is RecordDescriptor.Reflective<*> -> {}
+            is PrimitiveDescriptor.Reflective<*> -> {}
+            is OptionalDescriptor.Reflective<*> -> {}
+            is OptionalDescriptor.JavaReflective<*> -> {}
+            is ArrayDescriptor.Reflective<*, *> -> {}
+            is RecordDescriptor.Reflective<*, *> -> {}
         }
         when (Serializers.bool.typeDescriptor) {
-            is PrimitiveDescriptor -> {}
-            is OptionalDescriptor.Reflective -> {}
-            is ArrayDescriptor.Reflective -> {}
+            is PrimitiveDescriptor.Reflective<*> -> {}
+            is OptionalDescriptor.Reflective<*> -> {}
+            is OptionalDescriptor.JavaReflective<*> -> {}
+            is ArrayDescriptor.Reflective<*, *> -> {}
             is StructDescriptor.Reflective<*, *> -> {}
             is EnumDescriptor.Reflective<*> -> {}
         }
         when (parseTypeDescriptorImpl(Serializers.bool.typeDescriptor.asJson())) {
             is PrimitiveDescriptor -> {}
             is OptionalDescriptor -> {}
+            is OptionalDescriptor.JavaReflective<*> -> {}
             is ArrayDescriptor -> {}
             is RecordDescriptor<*> -> {}
         }
