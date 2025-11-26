@@ -74,7 +74,7 @@ sealed interface TypeDescriptor : TypeDescriptorBase {
          * struct, enum, optional, etc.
          *
          * See a complete example at
-         * https://github.com/gepheum/soia-dart-example/blob/main/lib/all_strings_to_upper_case.dart
+         * https://github.com/gepheum/soia-java-example/blob/main/src/main/java/examples/AllStringsToUpperCase.java
          */
         fun accept(visitor: ReflectiveTypeVisitor<T>) {
             ReflectiveTypeVisitor.acceptImpl(this, visitor)

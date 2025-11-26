@@ -20,7 +20,7 @@ import java.time.Instant
  * [TypeDescriptor.Reflective.accept].
  *
  * See a complete example at
- * https://github.com/gepheum/soia-dart-example/blob/main/lib/all_strings_to_upper_case.dart
+ * https://github.com/gepheum/soia-java-example/blob/main/src/main/java/examples/AllStringsToUpperCase.java
  */
 interface ReflectiveTypeVisitor<T> {
     /** Visits a struct type. */
@@ -97,7 +97,7 @@ interface ReflectiveTypeVisitor<T> {
      * specific visit methods while leaving the others as no-ops.
      *
      * See a complete example at
-     * https://github.com/gepheum/soia-dart-example/blob/main/lib/all_strings_to_upper_case.dart
+     * https://github.com/gepheum/soia-java-example/blob/main/src/main/java/examples/AllStringsToUpperCase.java
      */
     open class Noop<T> : ReflectiveTypeVisitor<T> {
         override fun <Mutable> visitStruct(descriptor: StructDescriptor.Reflective<T, Mutable>) {
