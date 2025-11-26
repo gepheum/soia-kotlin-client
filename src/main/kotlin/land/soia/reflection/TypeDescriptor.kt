@@ -7,6 +7,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import land.soia.formatReadableJson
 import land.soia.internal.RecordId
+import okio.ByteString
+import java.time.Instant
 
 interface TypeDescriptorBase {
     /**
@@ -66,6 +68,17 @@ sealed interface TypeDescriptor : TypeDescriptorBase {
 
         /** A non-descriptive descriptor equivalent to this reflective descriptor. */
         val notReflective: TypeDescriptor get() = notReflectiveImpl(this, mutableMapOf())
+
+        /**
+         * Accepts a [visitor] to perform operations based on the actual Soia type:
+         * struct, enum, optional, etc.
+         *
+         * See a complete example at
+         * https://github.com/gepheum/soia-dart-example/blob/main/lib/all_strings_to_upper_case.dart
+         */
+        fun accept(visitor: ReflectiveTypeVisitor<T>) {
+            ReflectiveTypeVisitor.acceptImpl(this, visitor)
+        }
     }
 }
 
@@ -109,7 +122,57 @@ interface PrimitiveDescriptorBase : TypeDescriptorBase {
 
 /** Describes a primitive type such as integers, strings, booleans, etc. */
 class PrimitiveDescriptor private constructor(override val primitiveType: PrimitiveType) : PrimitiveDescriptorBase, TypeDescriptor {
-    interface Reflective<T> : PrimitiveDescriptorBase, TypeDescriptor.Reflective<T>
+    sealed interface Reflective<T> : PrimitiveDescriptorBase, TypeDescriptor.Reflective<T> {
+        object Bool : Reflective<Boolean> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.BOOL
+        }
+
+        object Int32 : Reflective<Int> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.INT_32
+        }
+
+        object Int64 : Reflective<Long> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.INT_64
+        }
+
+        object Uint64 : Reflective<ULong> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.UINT_64
+        }
+
+        object JavaUint64 : Reflective<Long> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.UINT_64
+        }
+
+        object Float32 : Reflective<Float> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.FLOAT_32
+        }
+
+        object Float64 : Reflective<Double> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.FLOAT_64
+        }
+
+        object Timestamp : Reflective<Instant> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.TIMESTAMP
+        }
+
+        object String : Reflective<kotlin.String> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.STRING
+        }
+
+        object Bytes : Reflective<ByteString> {
+            override val primitiveType: PrimitiveType
+                get() = PrimitiveType.BYTES
+        }
+    }
 
     companion object {
         private val instances = PrimitiveType.entries.map { PrimitiveDescriptor(it) }.toList()
@@ -141,14 +204,44 @@ class OptionalDescriptor internal constructor(
      * The value type on the JVM side is `T?`.
      * Preferred in Kotlin over [OptionalDescriptor.JavaReflective].
      */
-    interface Reflective<T> : OptionalDescriptorBase<TypeDescriptor.Reflective<*>>, TypeDescriptor.Reflective<T?>
+    interface Reflective<T : Any> : OptionalDescriptorBase<TypeDescriptor.Reflective<T>>, TypeDescriptor.Reflective<T?> {
+        /**
+         * Transforms the wrapped value if present, preserving null values.
+         */
+        fun map(
+            input: T?,
+            transformer: ReflectiveTransformer,
+        ): T? {
+            return if (input == null) {
+                null
+            } else {
+                transformer.transform(input, otherType)
+            }
+        }
+    }
 
     /**
      * Adds runtime introspection capabilities to an [OptionalDescriptor].
      * The value type on the JVM side is `java.util.Optional<T>`.
      * Preferred in Java over [OptionalDescriptor.Reflective].
      */
-    interface JavaReflective<T> : OptionalDescriptorBase<TypeDescriptor.Reflective<*>>, TypeDescriptor.Reflective<java.util.Optional<T>>
+    interface JavaReflective<T : Any> :
+        OptionalDescriptorBase<TypeDescriptor.Reflective<T>>,
+        TypeDescriptor.Reflective<java.util.Optional<T>> {
+        /**
+         * Transforms the wrapped value if present, preserving empty optionals.
+         */
+        fun map(
+            input: java.util.Optional<T>,
+            transformer: ReflectiveTransformer,
+        ): java.util.Optional<T> {
+            return if (input.isPresent) {
+                java.util.Optional.of(transformer.transform(input.get(), otherType))
+            } else {
+                input
+            }
+        }
+    }
 }
 
 interface ArrayDescriptorBase<ItemType : TypeDescriptorBase> : TypeDescriptorBase {
@@ -167,7 +260,26 @@ class ArrayDescriptor internal constructor(
     override val keyProperty: String?,
 ) : ArrayDescriptorBase<TypeDescriptor>, TypeDescriptor {
     /** Adds runtime introspection capabilities to a [ArrayDescriptor]. */
-    interface Reflective<E, L : List<E>> : ArrayDescriptorBase<TypeDescriptor.Reflective<*>>, TypeDescriptor.Reflective<L>
+    interface Reflective<E, L : List<E>> : ArrayDescriptorBase<TypeDescriptor.Reflective<E>>, TypeDescriptor.Reflective<L> {
+        /** Converts the given list to the specific list type L. */
+        fun toList(list: List<E>): L
+
+        /**
+         * Transforms each element in the collection using [transformer].
+         * Returns a new list containing the transformed elements.
+         * Preserves object identity if no elements changed.
+         */
+        fun map(
+            collection: L,
+            transformer: ReflectiveTransformer,
+        ): L {
+            return toList(
+                collection.map { element ->
+                    transformer.transform(element, itemType)
+                },
+            )
+        }
+    }
 }
 
 interface FieldBase {
@@ -255,7 +367,7 @@ class StructField internal constructor(
     override val type: TypeDescriptor,
 ) : StructFieldBase<TypeDescriptor> {
     /** Adds runtime introspection capabilities to a [StructField]. */
-    interface Reflective<Frozen, Mutable, Value> : StructFieldBase<TypeDescriptor.Reflective<*>> {
+    interface Reflective<Frozen, Mutable, Value> : StructFieldBase<TypeDescriptor.Reflective<Value>> {
         /** Extracts the value of the field from the given struct. */
         fun get(struct: Frozen): Value
 
@@ -264,6 +376,24 @@ class StructField internal constructor(
             struct: Mutable,
             value: Value,
         )
+
+        /**
+         * Copies this field's value from [source] to [target].
+         * If a [transformer] is provided, it is applied to the value before setting it.
+         */
+        fun copy(
+            source: Frozen,
+            target: Mutable,
+            transformer: ReflectiveTransformer = ReflectiveTransformer.Identity,
+        ) {
+            set(
+                target,
+                transformer.transform(
+                    get(source),
+                    type,
+                ),
+            )
+        }
     }
 }
 
@@ -305,6 +435,22 @@ class StructDescriptor internal constructor(
          * Converts a mutable struct instance to its frozen (immutable) form.
          */
         fun toFrozen(mutable: Mutable): Frozen
+
+        /**
+         * Applies [transformer] to each field value in [struct]. Returns a frozen
+         * struct containing the transformed field values.
+         * Preserves object identity if no fields changed.
+         */
+        fun mapFields(
+            struct: Frozen,
+            transformer: ReflectiveTransformer,
+        ): Frozen {
+            val mutable = newMutable()
+            for (field in fields) {
+                field.copy(struct, mutable, transformer)
+            }
+            return toFrozen(mutable)
+        }
     }
 }
 
@@ -339,26 +485,37 @@ class EnumWrapperField internal constructor(
     override val number: Int,
     override val type: TypeDescriptor,
 ) : EnumWrapperFieldBase<TypeDescriptor>, EnumField {
-    /** Adds runtime introspection capabilities to an [EnumWrapperField].
+    /**
+     * Adds runtime introspection capabilities to an [EnumWrapperField].
      *
      * @param Enum The enum type
      * @param Value The type of the associated value
      */
-    interface Reflective<Enum, Value> : EnumWrapperFieldBase<TypeDescriptor.Reflective<*>>, EnumField.Reflective<Enum> {
-        /** Returns whether the given enum instance if it matches this enum field. */
+    interface Reflective<Enum, Value> : EnumWrapperFieldBase<TypeDescriptor.Reflective<Value>>, EnumField.Reflective<Enum> {
+        /** Returns whether the variant of the given enum instance matches this field. */
         fun test(e: Enum): Boolean
 
         /**
-         * Extracts the value held by the given enum instance assuming it matches this
-         * enum field. The behavior is undefined if `test(e)` is false.
+         * Extracts the value held by the given enum instance assuming its variant
+         * matches this field. Throws an exception if `test(e)` is false.
          */
         fun get(e: Enum): Value
 
         /**
-         * Returns a new enum instance matching this enum field and holding the given
-         * value.
+         * Returns a new enum instance holding the given value.
          */
         fun wrap(value: Value): Enum
+
+        /**
+         * Applies [transformer] to the wrapped value and returns a new enum instance
+         * wrapping around it. Throws an exception if `test(e)` is false.
+         */
+        fun mapValue(
+            e: Enum,
+            transformer: ReflectiveTransformer,
+        ): Enum {
+            return wrap(transformer.transform(get(e), type))
+        }
     }
 }
 
@@ -392,6 +549,23 @@ class EnumDescriptor internal constructor(
         RecordDescriptor.Reflective<Enum, EnumField.Reflective<Enum>> {
         /** Looks up the field corresponding to the given instance of Enum. */
         fun getField(e: Enum): EnumField.Reflective<Enum>
+
+        /**
+         * If [e] holds a value (wrapper variant), extracts the value, transforms it
+         * and returns a new enum instance wrapping around it.
+         * Otherwise, returns [e] unchanged.
+         */
+        fun mapValue(
+            e: Enum,
+            transformer: ReflectiveTransformer,
+        ): Enum {
+            val field = getField(e)
+            return if (field is EnumWrapperField.Reflective<Enum, *>) {
+                field.mapValue(e, transformer)
+            } else {
+                e
+            }
+        }
     }
 }
 

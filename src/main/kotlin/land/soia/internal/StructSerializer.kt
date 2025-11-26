@@ -75,7 +75,7 @@ class StructSerializer<Frozen : Any, Mutable : Any>(
             serializer.impl.appendString(getter(input), out, eolIndent)
         }
 
-        override val type: TypeDescriptor.Reflective<*>
+        override val type: TypeDescriptor.Reflective<Value>
             get() = serializer.impl.typeDescriptor
 
         override fun set(

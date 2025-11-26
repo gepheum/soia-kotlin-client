@@ -233,7 +233,7 @@ class EnumSerializer<Enum : Any> private constructor(
             out.append(eolIndent).append(')')
         }
 
-        override val type: TypeDescriptor.Reflective<*>
+        override val type: TypeDescriptor.Reflective<T>
             get() = valueSerializer.impl.typeDescriptor
 
         override fun test(e: Enum): Boolean {

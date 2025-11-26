@@ -2,11 +2,10 @@ package land.soia.internal
 
 import kotlinx.serialization.json.JsonElement
 import land.soia.reflection.TypeDescriptor
-import land.soia.reflection.TypeDescriptorBase
 import okio.Buffer
 import okio.BufferedSource
 
-abstract class SerializerImpl<T> : TypeDescriptorBase {
+abstract class SerializerImpl<T> {
     abstract fun isDefault(value: T): Boolean
 
     abstract fun toJson(

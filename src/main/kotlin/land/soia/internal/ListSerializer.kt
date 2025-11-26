@@ -62,12 +62,16 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
             return emptyList
         }
         val size =
-            if (wire == 250) {
-                decodeNumber(buffer).toInt()
-            } else if (wire in 247..249) {
-                wire - 246
-            } else {
-                throw IllegalArgumentException("Expected: list; wire: $wire")
+            when (wire) {
+                250 -> {
+                    decodeNumber(buffer).toInt()
+                }
+                in 247..249 -> {
+                    wire - 246
+                }
+                else -> {
+                    throw IllegalArgumentException("Expected: list; wire: $wire")
+                }
             }
         val items = mutableListOf<E>()
         for (i in 0 until size) {
@@ -117,7 +121,7 @@ private abstract class AbstractListSerializer<E, L : List<E>>(
 
     abstract val emptyList: L
 
-    abstract fun toList(list: List<E>): L
+    abstract override fun toList(list: List<E>): L
 
     final override val itemType: TypeDescriptor.Reflective<E>
         get() = item.typeDescriptor
