@@ -1,12 +1,12 @@
 package land.soia.service
 
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import land.soia.JsonFlavor
 import land.soia.UnrecognizedFieldsPolicy
 import land.soia.internal.formatReadableJson
 import java.net.http.HttpHeaders
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.JsonArray
 
 /**
  * Implementation of a soia service.
@@ -103,18 +103,19 @@ class Service private constructor(private val impl: Impl<*>) {
             unrecognizedFields: UnrecognizedFieldsPolicy,
         ): RawResponse {
             if (requestBody.isEmpty() || requestBody == "list") {
-                val methodsData = JsonArray(
-                    methodImpls.values.map { methodImpl ->
-                        JsonObject(
-                            mapOf(
-                                "method" to JsonPrimitive(methodImpl.method.name),
-                                "number" to JsonPrimitive(methodImpl.method.number),
-                                "request" to methodImpl.method.requestSerializer.typeDescriptor.asJson(),
-                                "response" to methodImpl.method.responseSerializer.typeDescriptor.asJson(),
+                val methodsData =
+                    JsonArray(
+                        methodImpls.values.map { methodImpl ->
+                            JsonObject(
+                                mapOf(
+                                    "method" to JsonPrimitive(methodImpl.method.name),
+                                    "number" to JsonPrimitive(methodImpl.method.number),
+                                    "request" to methodImpl.method.requestSerializer.typeDescriptor.asJson(),
+                                    "response" to methodImpl.method.responseSerializer.typeDescriptor.asJson(),
+                                ),
                             )
-                        )
-                    }
-                )
+                        },
+                    )
                 val json = JsonObject(mapOf("methods" to methodsData))
                 val jsonCode =
                     formatReadableJson(json)
