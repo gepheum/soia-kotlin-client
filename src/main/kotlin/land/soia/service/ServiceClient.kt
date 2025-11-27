@@ -1,6 +1,7 @@
 package land.soia.service
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import land.soia.UnrecognizedFieldsPolicy
 import java.io.IOException
@@ -67,6 +68,20 @@ class ServiceClient(
                 }
                 throw IOException("HTTP status ${httpResponse.statusCode()}$message")
             }
+        }
+
+    /**
+     * Invokes the given method on the remote server through an RPC.
+     * This is a blocking version suitable for calling from Java.
+     */
+    fun <Request, Response> invokeRemoteBlocking(
+        method: Method<Request, Response>,
+        request: Request,
+        requestHeaders: Map<String, List<String>> = defaultRequestHeaders,
+        timeout: Duration = MAX_DURATION,
+    ): Response =
+        runBlocking {
+            invokeRemote(method, request, requestHeaders, timeout)
         }
 
     companion object {
