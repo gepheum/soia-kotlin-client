@@ -2,7 +2,11 @@ package land.soia.service
 
 import land.soia.JsonFlavor
 import land.soia.UnrecognizedFieldsPolicy
+import land.soia.internal.formatReadableJson
 import java.net.http.HttpHeaders
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonArray
 
 /**
  * Implementation of a soia service.
@@ -99,21 +103,21 @@ class Service private constructor(private val impl: Impl<*>) {
             unrecognizedFields: UnrecognizedFieldsPolicy,
         ): RawResponse {
             if (requestBody.isEmpty() || requestBody == "list") {
-                val methodsData =
+                val methodsData = JsonArray(
                     methodImpls.values.map { methodImpl ->
-                        mapOf(
-                            "method" to methodImpl.method.name,
-                            "number" to methodImpl.method.number,
-                            "request" to methodImpl.method.requestSerializer.typeDescriptor.asJson(),
-                            "response" to methodImpl.method.responseSerializer.typeDescriptor.asJson(),
+                        JsonObject(
+                            mapOf(
+                                "method" to JsonPrimitive(methodImpl.method.name),
+                                "number" to JsonPrimitive(methodImpl.method.number),
+                                "request" to methodImpl.method.requestSerializer.typeDescriptor.asJson(),
+                                "response" to methodImpl.method.responseSerializer.typeDescriptor.asJson(),
+                            )
                         )
                     }
-                val json = mapOf("methods" to methodsData)
+                )
+                val json = JsonObject(mapOf("methods" to methodsData))
                 val jsonCode =
-                    PRETTY_JSON.encodeToString(
-                        kotlinx.serialization.json.JsonElement.serializer(),
-                        kotlinx.serialization.json.Json.parseToJsonElement(json.toString()),
-                    )
+                    formatReadableJson(json)
                 return RawResponse(jsonCode, RawResponse.ResponseType.OK_JSON)
             } else if (requestBody == "restudio") {
                 return RawResponse(RESTUDIO_HTML, RawResponse.ResponseType.OK_HTML)
@@ -189,8 +193,6 @@ class Service private constructor(private val impl: Impl<*>) {
             (
                 Builder<RequestMeta>(getRequestMeta)
             )
-
-        private val PRETTY_JSON = kotlinx.serialization.json.Json { prettyPrint = true }
 
         // Copied from
         //   https://github.com/gepheum/restudio/blob/main/index.jsdeliver.html

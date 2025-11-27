@@ -3,6 +3,8 @@ package land.soia
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import land.soia.internal.SerializerImpl
+import land.soia.internal.formatDenseJson
+import land.soia.internal.formatReadableJson
 import land.soia.reflection.TypeDescriptor
 import okio.Buffer
 import okio.ByteString
