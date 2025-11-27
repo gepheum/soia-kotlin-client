@@ -1,6 +1,7 @@
 package land.soia.service
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import land.soia.JsonFlavor
@@ -97,6 +98,15 @@ class Service private constructor(private val impl: Impl<*>) {
         val getRequestMeta: (HttpHeaders) -> RequestMeta,
         val methodImpls: Map<Int, MethodImpl<*, *, RequestMeta>>,
     ) {
+        private fun getMethodNumberByName(methodName: String): Int? {
+            val nameMatches = methodImpls.values.filter { it.method.name == methodName }
+            return when {
+                nameMatches.isEmpty() -> null
+                nameMatches.size > 1 -> null
+                else -> nameMatches[0].method.number
+            }
+        }
+
         suspend fun handleRequest(
             requestBody: String,
             requestHeaders: HttpHeaders,
@@ -124,24 +134,129 @@ class Service private constructor(private val impl: Impl<*>) {
                 return RawResponse(RESTUDIO_HTML, RawResponse.ResponseType.OK_HTML)
             }
 
-            val regex = Regex("^([^:]*):([^:]*):([^:]*):(\\S[\\s\\S]*)$")
-            val matchResult =
-                regex.find(requestBody)
-                    ?: return RawResponse(
-                        "bad request: invalid request format",
-                        RawResponse.ResponseType.BAD_REQUEST,
-                    )
+            // Method invocation
+            val methodName: String
+            val methodNumber: Int
+            val format: String
+            val requestDataJson: JsonElement?
+            val requestDataCode: String?
 
-            val (methodName, methodNumberStr, format, requestData) = matchResult.destructured
+            val firstChar = requestBody[0]
+            if (firstChar.isWhitespace() || firstChar == '{') {
+                // A JSON object
+                val reqBodyJson: JsonObject =
+                    try {
+                        kotlinx.serialization.json.Json.parseToJsonElement(requestBody) as? JsonObject
+                            ?: return RawResponse(
+                                "bad request: expected JSON object",
+                                RawResponse.ResponseType.BAD_REQUEST,
+                            )
+                    } catch (e: Exception) {
+                        return RawResponse("bad request: invalid JSON", RawResponse.ResponseType.BAD_REQUEST)
+                    }
 
-            val methodNumberRegex = Regex("-?[0-9]+")
-            if (!methodNumberRegex.matches(methodNumberStr)) {
-                return RawResponse(
-                    "bad request: can't parse method number",
-                    RawResponse.ResponseType.BAD_REQUEST,
-                )
+                val methodField =
+                    reqBodyJson["method"]
+                        ?: return RawResponse(
+                            "bad request: missing 'method' field in JSON",
+                            RawResponse.ResponseType.BAD_REQUEST,
+                        )
+
+                when (methodField) {
+                    is JsonPrimitive -> {
+                        if (methodField.isString) {
+                            methodName = methodField.content
+                            // Try to get the method number by name
+                            val foundNumber = getMethodNumberByName(methodName)
+                            if (foundNumber == null) {
+                                val nameMatches = methodImpls.values.filter { it.method.name == methodName }
+                                if (nameMatches.isEmpty()) {
+                                    return RawResponse(
+                                        "bad request: method not found: $methodName",
+                                        RawResponse.ResponseType.BAD_REQUEST,
+                                    )
+                                } else {
+                                    return RawResponse(
+                                        "bad request: method name '$methodName' is ambiguous; use method number instead",
+                                        RawResponse.ResponseType.BAD_REQUEST,
+                                    )
+                                }
+                            }
+                            methodNumber = foundNumber
+                        } else {
+                            methodName = "?"
+                            methodNumber = methodField.content.toIntOrNull()
+                                ?: return RawResponse(
+                                    "bad request: 'method' field must be a string or an integer",
+                                    RawResponse.ResponseType.BAD_REQUEST,
+                                )
+                        }
+                    }
+                    else -> {
+                        return RawResponse(
+                            "bad request: 'method' field must be a string or an integer",
+                            RawResponse.ResponseType.BAD_REQUEST,
+                        )
+                    }
+                }
+
+                format = "readable"
+
+                val requestField =
+                    reqBodyJson["request"]
+                        ?: return RawResponse(
+                            "bad request: missing 'request' field in JSON",
+                            RawResponse.ResponseType.BAD_REQUEST,
+                        )
+
+                requestDataJson = requestField
+                requestDataCode = null
+            } else {
+                // A colon-separated string
+                val regex = Regex("^([^:]*):([^:]*):([^:]*):(\\S[\\s\\S]*)$")
+                val matchResult =
+                    regex.find(requestBody)
+                        ?: return RawResponse(
+                            "bad request: invalid request format",
+                            RawResponse.ResponseType.BAD_REQUEST,
+                        )
+
+                val (methodNamePart, methodNumberStr, formatPart, requestDataPart) = matchResult.destructured
+
+                methodName = methodNamePart
+                format = formatPart
+                requestDataJson = null
+                requestDataCode = requestDataPart
+
+                if (methodNumberStr.isNotEmpty()) {
+                    val methodNumberRegex = Regex("-?[0-9]+")
+                    if (!methodNumberRegex.matches(methodNumberStr)) {
+                        return RawResponse(
+                            "bad request: can't parse method number",
+                            RawResponse.ResponseType.BAD_REQUEST,
+                        )
+                    }
+                    methodNumber = methodNumberStr.toInt()
+                } else {
+                    // Try to get the method number by name
+                    val foundNumber = getMethodNumberByName(methodName)
+                    if (foundNumber == null) {
+                        val nameMatches = methodImpls.values.filter { it.method.name == methodName }
+                        if (nameMatches.isEmpty()) {
+                            return RawResponse(
+                                "bad request: method not found: $methodName",
+                                RawResponse.ResponseType.BAD_REQUEST,
+                            )
+                        } else {
+                            return RawResponse(
+                                "bad request: method name '$methodName' is ambiguous; use method number instead",
+                                RawResponse.ResponseType.BAD_REQUEST,
+                            )
+                        }
+                    }
+                    methodNumber = foundNumber
+                }
             }
-            val methodNumber = methodNumberStr.toInt()
 
             val methodImpl =
                 methodImpls[methodNumber]
@@ -152,7 +267,11 @@ class Service private constructor(private val impl: Impl<*>) {
 
             val req: Any? =
                 try {
-                    methodImpl.method.requestSerializer.fromJsonCode(requestData, unrecognizedFields)
+                    if (requestDataCode != null) {
+                        methodImpl.method.requestSerializer.fromJsonCode(requestDataCode, unrecognizedFields)
+                    } else {
+                        methodImpl.method.requestSerializer.fromJson(requestDataJson!!, unrecognizedFields)
+                    }
                 } catch (e: Exception) {
                     return RawResponse(
                         "bad request: can't parse JSON: ${e.message}",
