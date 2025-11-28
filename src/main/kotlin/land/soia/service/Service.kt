@@ -130,7 +130,7 @@ class Service private constructor(private val impl: Impl<*>) {
                 val jsonCode =
                     formatReadableJson(json)
                 return RawResponse(jsonCode, RawResponse.ResponseType.OK_JSON)
-            } else if (requestBody == "restudio") {
+            } else if (requestBody == "debug" || requestBody == "restudio") {
                 return RawResponse(RESTUDIO_HTML, RawResponse.ResponseType.OK_HTML)
             }
 
