@@ -370,7 +370,9 @@ class EnumSerializer<Enum : Any> private constructor(
                 val name = json["kind"]!!.jsonPrimitive.content
                 val value = json["value"]!!
                 return when (val variant = nameToVariant[name]) {
-                    is UnknownVariant<Enum>, is ConstantVariant<Enum> -> throw IllegalArgumentException("$name refers to a constant variant")
+                    is UnknownVariant<Enum>, is ConstantVariant<Enum> -> throw IllegalArgumentException(
+                        "$name refers to a constant variant",
+                    )
                     is WrapperVariant<Enum, *> -> WrapperVariant.wrapFromJson(variant, value)
                     null -> unknown.constant
                 }
