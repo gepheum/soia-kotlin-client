@@ -73,7 +73,7 @@ class Service private constructor(private val impl: Impl<*>) {
     class Builder<RequestMeta> internal constructor(
         private val getRequestMeta: (HttpHeaders) -> RequestMeta,
     ) {
-        private val methodImpls: MutableMap<Int, MethodImpl<*, *, RequestMeta>> = mutableMapOf()
+        private val methodImpls: MutableMap<Long, MethodImpl<*, *, RequestMeta>> = mutableMapOf()
 
         /**
          * Registers the implementation of a method.
@@ -97,9 +97,9 @@ class Service private constructor(private val impl: Impl<*>) {
 
     private class Impl<RequestMeta>(
         val getRequestMeta: (HttpHeaders) -> RequestMeta,
-        val methodImpls: Map<Int, MethodImpl<*, *, RequestMeta>>,
+        val methodImpls: Map<Long, MethodImpl<*, *, RequestMeta>>,
     ) {
-        private fun getMethodNumberByName(methodName: String): Int? {
+        private fun getMethodNumberByName(methodName: String): Long? {
             val nameMatches = methodImpls.values.filter { it.method.name == methodName }
             return when {
                 nameMatches.isEmpty() -> null
@@ -136,7 +136,7 @@ class Service private constructor(private val impl: Impl<*>) {
 
             // Method invocation
             val methodName: String
-            val methodNumber: Int
+            val methodNumber: Long
             val format: String
             val requestDataJson: JsonElement?
             val requestDataCode: String?
@@ -170,13 +170,13 @@ class Service private constructor(private val impl: Impl<*>) {
                             val foundNumber = getMethodNumberByName(methodName)
                             if (foundNumber == null) {
                                 val nameMatches = methodImpls.values.filter { it.method.name == methodName }
-                                if (nameMatches.isEmpty()) {
-                                    return RawResponse(
+                                return if (nameMatches.isEmpty()) {
+                                    RawResponse(
                                         "bad request: method not found: $methodName",
                                         RawResponse.ResponseType.BAD_REQUEST,
                                     )
                                 } else {
-                                    return RawResponse(
+                                    RawResponse(
                                         "bad request: method name '$methodName' is ambiguous; use method number instead",
                                         RawResponse.ResponseType.BAD_REQUEST,
                                     )
@@ -185,7 +185,7 @@ class Service private constructor(private val impl: Impl<*>) {
                             methodNumber = foundNumber
                         } else {
                             methodName = "?"
-                            methodNumber = methodField.content.toIntOrNull()
+                            methodNumber = methodField.content.toLongOrNull()
                                 ?: return RawResponse(
                                     "bad request: 'method' field must be a string or an integer",
                                     RawResponse.ResponseType.BAD_REQUEST,
@@ -236,19 +236,19 @@ class Service private constructor(private val impl: Impl<*>) {
                             RawResponse.ResponseType.BAD_REQUEST,
                         )
                     }
-                    methodNumber = methodNumberStr.toInt()
+                    methodNumber = methodNumberStr.toLong()
                 } else {
                     // Try to get the method number by name
                     val foundNumber = getMethodNumberByName(methodName)
                     if (foundNumber == null) {
                         val nameMatches = methodImpls.values.filter { it.method.name == methodName }
-                        if (nameMatches.isEmpty()) {
-                            return RawResponse(
+                        return if (nameMatches.isEmpty()) {
+                            RawResponse(
                                 "bad request: method not found: $methodName",
                                 RawResponse.ResponseType.BAD_REQUEST,
                             )
                         } else {
-                            return RawResponse(
+                            RawResponse(
                                 "bad request: method name '$methodName' is ambiguous; use method number instead",
                                 RawResponse.ResponseType.BAD_REQUEST,
                             )

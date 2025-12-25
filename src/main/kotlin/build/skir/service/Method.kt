@@ -16,7 +16,7 @@ class Method<Request, Response>(
     @get:JvmName("name")
     val name: String,
     @get:JvmName("number")
-    val number: Int,
+    val number: Long,
     @get:JvmName("requestSerializer")
     val requestSerializer: Serializer<Request>,
     @get:JvmName("responseSerializer")
