@@ -76,10 +76,10 @@ class EnumSerializerTest {
             { unrecognized -> Color.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
         ).apply {
-            addConstantField(1, "red", 1, "", Color.RED)
-            addConstantField(2, "green", 2, "", Color.GREEN)
-            addConstantField(3, "blue", 3, "", Color.BLUE)
-            addWrapperField(4, "custom", 4, build.skir.Serializers.int32, "", { Color.CustomOption(it) }, { it.rgb })
+            addConstantVariant(1, "red", 1, "", Color.RED)
+            addConstantVariant(2, "green", 2, "", Color.GREEN)
+            addConstantVariant(3, "blue", 3, "", Color.BLUE)
+            addWrapperVariant(4, "custom", 4, build.skir.Serializers.int32, "", { Color.CustomOption(it) }, { it.rgb })
             finalizeEnum()
         }
 
@@ -94,9 +94,9 @@ class EnumSerializerTest {
             { unrecognized -> Status.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
         ).apply {
-            addConstantField(1, "active", 1, "active status", Status.ACTIVE)
-            addConstantField(2, "inactive", 2, "", Status.INACTIVE)
-            addWrapperField(3, "pending", 3, build.skir.Serializers.string, "pending status", { Status.PendingOption(it) }, { it.reason })
+            addConstantVariant(1, "active", 1, "active status", Status.ACTIVE)
+            addConstantVariant(2, "inactive", 2, "", Status.INACTIVE)
+            addWrapperVariant(3, "pending", 3, build.skir.Serializers.string, "pending status", { Status.PendingOption(it) }, { it.reason })
             addRemovedNumber(4) // Removed field number
             finalizeEnum()
         }
@@ -357,13 +357,13 @@ class EnumSerializerTest {
                 { enum -> enum.unrecognized },
             )
 
-        testEnumSerializer.addConstantField(1, "test", 1, "", Color.RED)
+        testEnumSerializer.addConstantVariant(1, "test", 1, "", Color.RED)
         testEnumSerializer.finalizeEnum()
 
         // Adding fields after finalization should throw
         var exceptionThrown = false
         try {
-            testEnumSerializer.addConstantField(2, "test2", 2, "", Color.GREEN)
+            testEnumSerializer.addConstantVariant(2, "test2", 2, "", Color.GREEN)
         } catch (e: IllegalStateException) {
             exceptionThrown = true
         }

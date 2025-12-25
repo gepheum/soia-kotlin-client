@@ -463,52 +463,52 @@ class StructDescriptor internal constructor(
     }
 }
 
-/** Describes a field in an enum. Can be either a constant field or a wrapper field. */
+/** Describes a variant in an enum. Can be either a constant variant or a wrapper variant. */
 sealed interface EnumVariant : FieldOrVariant {
     /** Adds runtime introspection capabilities to an [EnumVariant]. */
     sealed interface Reflective<Enum> : FieldOrVariant
 }
 
-interface EnumConstantFieldBase : FieldOrVariant
+interface EnumConstantVariantBase : FieldOrVariant
 
-/** Describes an enum constant field. */
-class EnumConstantField internal constructor(
+/** Describes an enum constant variant. */
+class EnumConstantVariant internal constructor(
     override val name: String,
     override val number: Int,
     override val doc: String,
-) : EnumConstantFieldBase, EnumVariant {
-    /** Adds runtime introspection capabilities to an [EnumConstantField]. */
-    interface Reflective<Enum> : EnumConstantFieldBase, EnumVariant.Reflective<Enum> {
-        /** The constant value represented by this field. */
+) : EnumConstantVariantBase, EnumVariant {
+    /** Adds runtime introspection capabilities to an [EnumConstantVariant]. */
+    interface Reflective<Enum> : EnumConstantVariantBase, EnumVariant.Reflective<Enum> {
+        /** The constant value represented by this variant. */
         val constant: Enum
     }
 }
 
-interface EnumWrapperFieldBase<TypeDescriptor : TypeDescriptorBase> : FieldOrVariant {
-    /** The type of the value associated with this enum field. */
+interface EnumWrapperVariantBase<TypeDescriptor : TypeDescriptorBase> : FieldOrVariant {
+    /** The type of the value associated with this enum variant. */
     val type: TypeDescriptor
 }
 
-/** Describes an enum wrapper field. */
+/** Describes an enum wrapper variant. */
 class EnumWrapperVariant internal constructor(
     override val name: String,
     override val number: Int,
     override val type: TypeDescriptor,
     override val doc: String,
-) : EnumWrapperFieldBase<TypeDescriptor>, EnumVariant {
+) : EnumWrapperVariantBase<TypeDescriptor>, EnumVariant {
     /**
      * Adds runtime introspection capabilities to an [EnumWrapperVariant].
      *
      * @param Enum The enum type
      * @param Value The type of the associated value
      */
-    interface Reflective<Enum, Value> : EnumWrapperFieldBase<TypeDescriptor.Reflective<Value>>, EnumVariant.Reflective<Enum> {
-        /** Returns whether the variant of the given enum instance matches this field. */
+    interface Reflective<Enum, Value> : EnumWrapperVariantBase<TypeDescriptor.Reflective<Value>>, EnumVariant.Reflective<Enum> {
+        /** Returns whether the variant of the given enum instance matches this variant. */
         fun test(e: Enum): Boolean
 
         /**
          * Extracts the value held by the given enum instance assuming its variant
-         * matches this field. Throws an exception if `test(e)` is false.
+         * matches this variant. Throws an exception if `test(e)` is false.
          */
         fun get(e: Enum): Value
 
@@ -594,8 +594,8 @@ class EnumDescriptor internal constructor(
     interface Reflective<Enum> :
         EnumDescriptorBase<EnumVariant.Reflective<Enum>>,
         RecordDescriptor.Reflective<Enum, EnumVariant.Reflective<Enum>> {
-        /** Looks up the field corresponding to the given instance of Enum. */
-        fun getField(e: Enum): EnumVariant.Reflective<Enum>
+        /** Looks up the variant corresponding to the given instance of Enum. */
+        fun getVariant(e: Enum): EnumVariant.Reflective<Enum>
 
         /**
          * If [e] holds a value (wrapper variant), extracts the value, transforms it
@@ -606,9 +606,9 @@ class EnumDescriptor internal constructor(
             e: Enum,
             transformer: ReflectiveTransformer,
         ): Enum {
-            val field = getField(e)
-            return if (field is EnumWrapperVariant.Reflective<Enum, *>) {
-                field.mapValue(e, transformer)
+            val variant = getVariant(e)
+            return if (variant is EnumWrapperVariant.Reflective<Enum, *>) {
+                variant.mapValue(e, transformer)
             } else {
                 e
             }
@@ -678,7 +678,7 @@ private fun notReflectiveImpl(
                             doc = it.doc,
                         )
                     } else {
-                        EnumConstantField(
+                        EnumConstantVariant(
                             name = it.name,
                             number = it.number,
                             doc = it.doc,

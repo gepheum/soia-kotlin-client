@@ -1,7 +1,7 @@
 package build.skir.internal
 
 import build.skir.Serializer
-import build.skir.reflection.EnumConstantField
+import build.skir.reflection.EnumConstantVariant
 import build.skir.reflection.EnumDescriptor
 import build.skir.reflection.EnumVariant
 import build.skir.reflection.EnumWrapperVariant
@@ -48,7 +48,7 @@ class EnumSerializer<Enum : Any> private constructor(
         )
     }
 
-    fun addConstantField(
+    fun addConstantVariant(
         number: Int,
         name: String,
         kindOrdinal: Int,
@@ -56,10 +56,10 @@ class EnumSerializer<Enum : Any> private constructor(
         instance: Enum,
     ) {
         checkNotFinalized()
-        addFieldImpl(ConstantField(number, name, kindOrdinal, doc, instance))
+        addVariantImpl(ConstantVariant(number, name, kindOrdinal, doc, instance))
     }
 
-    fun <Instance : Enum, T> addWrapperField(
+    fun <Instance : Enum, T> addWrapperVariant(
         number: Int,
         name: String,
         kindOrdinal: Int,
@@ -70,7 +70,7 @@ class EnumSerializer<Enum : Any> private constructor(
     ) {
         checkNotFinalized()
         @Suppress("UNCHECKED_CAST")
-        addFieldImpl(WrapperVariant(number, name, kindOrdinal, valueSerializer, doc, wrap, getValue as (Enum) -> T, getKindOrdinal))
+        addVariantImpl(WrapperVariant(number, name, kindOrdinal, valueSerializer, doc, wrap, getValue as (Enum) -> T, getKindOrdinal))
     }
 
     fun addRemovedNumber(number: Int) {
@@ -79,11 +79,11 @@ class EnumSerializer<Enum : Any> private constructor(
         numberToVariant[number] = RemovedNumber(number)
     }
 
-    private sealed class FieldOrRemoved<Enum> {
+    private sealed class VariantOrRemoved<Enum> {
         abstract val number: Int
     }
 
-    private sealed class Variant<Enum : Any> : FieldOrRemoved<Enum>() {
+    private sealed class Variant<Enum : Any> : VariantOrRemoved<Enum>() {
         abstract val name: String
         abstract val kindOrdinal: Int
 
@@ -103,10 +103,10 @@ class EnumSerializer<Enum : Any> private constructor(
             eolIndent: String,
         )
 
-        fun asDescriptorField(): EnumVariant.Reflective<Enum> {
+        fun asDescriptorVariant(): EnumVariant.Reflective<Enum> {
             return when (this) {
                 is UnknownVariant<Enum> -> this
-                is ConstantField<Enum> -> this
+                is ConstantVariant<Enum> -> this
                 is WrapperVariant<Enum, *> -> this
             }
         }
@@ -116,7 +116,7 @@ class EnumSerializer<Enum : Any> private constructor(
         override val constant: Enum,
         val wrapUnrecognized: (UnrecognizedVariant<Enum>) -> Enum,
         private val getUnrecognized: (Enum) -> UnrecognizedVariant<Enum>?,
-    ) : Variant<Enum>(), EnumConstantField.Reflective<Enum> {
+    ) : Variant<Enum>(), EnumConstantVariant.Reflective<Enum> {
         override val kindOrdinal = 0
         override val number get() = 0
         override val name get() = "?"
@@ -156,13 +156,13 @@ class EnumSerializer<Enum : Any> private constructor(
         }
     }
 
-    private class ConstantField<Enum : Any>(
+    private class ConstantVariant<Enum : Any>(
         override val number: Int,
         override val name: String,
         override val kindOrdinal: Int,
         override val doc: String,
         override val constant: Enum,
-    ) : Variant<Enum>(), EnumConstantField.Reflective<Enum> {
+    ) : Variant<Enum>(), EnumConstantVariant.Reflective<Enum> {
         override fun toJson(
             input: Enum,
             readableFlavor: Boolean,
@@ -274,18 +274,18 @@ class EnumSerializer<Enum : Any> private constructor(
 
     private class RemovedNumber<Enum>(
         override val number: Int,
-    ) : FieldOrRemoved<Enum>()
+    ) : VariantOrRemoved<Enum>()
 
-    private fun addFieldImpl(variant: Variant<Enum>) {
-        mutableFields.add(variant.asDescriptorField())
+    private fun addVariantImpl(variant: Variant<Enum>) {
+        mutableVariants.add(variant.asDescriptorVariant())
         numberToVariant[variant.number] = variant
-        nameToField[variant.name] = variant
+        nameToVariant[variant.name] = variant
         kindOrdinalToVariant[variant.kindOrdinal] = variant
     }
 
     fun finalizeEnum() {
         checkNotFinalized()
-        addFieldImpl(unknown)
+        addVariantImpl(unknown)
         finalized = true
     }
 
@@ -295,10 +295,10 @@ class EnumSerializer<Enum : Any> private constructor(
         }
     }
 
-    private val mutableFields = mutableListOf<EnumVariant.Reflective<Enum>>()
+    private val mutableVariants = mutableListOf<EnumVariant.Reflective<Enum>>()
     private val mutableRemovedNumbers = mutableSetOf<Int>()
-    private val numberToVariant = mutableMapOf<Int, FieldOrRemoved<Enum>>()
-    private val nameToField = mutableMapOf<String, Variant<Enum>>()
+    private val numberToVariant = mutableMapOf<Int, VariantOrRemoved<Enum>>()
+    private val nameToVariant = mutableMapOf<String, Variant<Enum>>()
     private val kindOrdinalToVariant = MutableList<Variant<Enum>?>(kindCount) { null }
     private var finalized = false
 
@@ -325,11 +325,11 @@ class EnumSerializer<Enum : Any> private constructor(
                     if (number != null) {
                         numberToVariant[number]
                     } else {
-                        nameToField[json.content]
+                        nameToVariant[json.content]
                     }
                 when (variant) {
                     is UnknownVariant<Enum> -> unknown.constant
-                    is ConstantField<Enum> -> variant.constant
+                    is ConstantVariant<Enum> -> variant.constant
                     is RemovedNumber<Enum> -> unknown.constant
                     is WrapperVariant<Enum, *> -> throw IllegalArgumentException("${variant.number} refers to a wrapper variant")
                     null ->
@@ -347,10 +347,10 @@ class EnumSerializer<Enum : Any> private constructor(
                     if (number != null) {
                         numberToVariant[number]
                     } else {
-                        nameToField[first.content]
+                        nameToVariant[first.content]
                     }
                 return when (variant) {
-                    is UnknownVariant<Enum>, is ConstantField<Enum> -> throw IllegalArgumentException(
+                    is UnknownVariant<Enum>, is ConstantVariant<Enum> -> throw IllegalArgumentException(
                         "$number refers to a constant variant",
                     )
                     is RemovedNumber<Enum> -> unknown.constant
@@ -369,8 +369,8 @@ class EnumSerializer<Enum : Any> private constructor(
             is JsonObject -> {
                 val name = json["kind"]!!.jsonPrimitive.content
                 val value = json["value"]!!
-                return when (val variant = nameToField[name]) {
-                    is UnknownVariant<Enum>, is ConstantField<Enum> -> throw IllegalArgumentException("$name refers to a constant variant")
+                return when (val variant = nameToVariant[name]) {
+                    is UnknownVariant<Enum>, is ConstantVariant<Enum> -> throw IllegalArgumentException("$name refers to a constant variant")
                     is WrapperVariant<Enum, *> -> WrapperVariant.wrapFromJson(variant, value)
                     null -> unknown.constant
                 }
@@ -397,7 +397,7 @@ class EnumSerializer<Enum : Any> private constructor(
             return when (val variant = numberToVariant[number]) {
                 is RemovedNumber -> unknown.constant
                 is UnknownVariant -> unknown.constant
-                is ConstantField<Enum> -> variant.constant
+                is ConstantVariant<Enum> -> variant.constant
                 is WrapperVariant<Enum, *> -> throw IllegalArgumentException("${variant.number} refers to a wrapper variant")
                 null -> {
                     if (keepUnrecognizedValues) {
@@ -416,7 +416,7 @@ class EnumSerializer<Enum : Any> private constructor(
                     decodeUnused(buffer)
                     unknown.constant
                 }
-                is UnknownVariant, is ConstantField<Enum> -> throw IllegalArgumentException("$number refers to a constant variant")
+                is UnknownVariant, is ConstantVariant<Enum> -> throw IllegalArgumentException("$number refers to a constant variant")
                 is WrapperVariant<Enum, *> ->
                     WrapperVariant.wrapDecoded(
                         variant,
@@ -462,27 +462,27 @@ class EnumSerializer<Enum : Any> private constructor(
         get() =
             java.util.Collections.unmodifiableList(
                 // Exclude the 'unknown' variant which is always at the end.
-                mutableFields.subList(0, mutableFields.size - 1),
+                mutableVariants.subList(0, mutableVariants.size - 1),
             )
 
     override val removedNumbers: Set<Int>
         get() = java.util.Collections.unmodifiableSet(mutableRemovedNumbers)
 
     override fun getVariant(name: String): EnumVariant.Reflective<Enum>? {
-        val variant = nameToField[name]
-        return variant?.asDescriptorField()
+        val variant = nameToVariant[name]
+        return variant?.asDescriptorVariant()
     }
 
     override fun getVariant(number: Int): EnumVariant.Reflective<Enum>? {
         return when (val variant = numberToVariant[number]) {
-            is Variant<Enum> -> variant.asDescriptorField()
+            is Variant<Enum> -> variant.asDescriptorVariant()
             null, is RemovedNumber<Enum> -> null
         }
     }
 
-    override fun getField(e: Enum): EnumVariant.Reflective<Enum> {
-        val field = kindOrdinalToVariant[getKindOrdinal(e)]!!
-        return field.asDescriptorField()
+    override fun getVariant(e: Enum): EnumVariant.Reflective<Enum> {
+        val variant = kindOrdinalToVariant[getKindOrdinal(e)]!!
+        return variant.asDescriptorVariant()
     }
 
     public override val typeDescriptor: EnumDescriptor.Reflective<Enum> get() = this

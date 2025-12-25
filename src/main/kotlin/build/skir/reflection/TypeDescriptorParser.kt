@@ -53,7 +53,7 @@ internal fun parseTypeDescriptorImpl(json: JsonElement): TypeDescriptor {
                             val type = parseTypeDescriptorImpl(typeJson, recordIdToBundle)
                             EnumWrapperVariant(name = name, number = number, type = type, doc = doc)
                         } else {
-                            EnumConstantField(name = name, number = number, doc = doc)
+                            EnumConstantVariant(name = name, number = number, doc = doc)
                         }
                     }.toList()
             }

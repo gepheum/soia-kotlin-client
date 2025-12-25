@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "build.skir"
-version = "0.0.3"
+version = "0.0.4"
 
 kotlin {
     compilerOptions {
@@ -55,7 +55,7 @@ mavenPublishing {
     coordinates(
         groupId = "build.skir",
         artifactId = "skir-client",
-        version = "0.0.3",
+        version = "0.0.4",
     )
 
     // Configure POM metadata for the published artifact
