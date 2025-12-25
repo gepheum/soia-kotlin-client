@@ -32,8 +32,8 @@ class EnumSerializer<Enum : Any> private constructor(
             getKindOrdinal: (Enum) -> Int,
             kindCount: Int,
             unknownInstance: Unknown,
-            wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Unknown,
-            getUnrecognized: (Unknown) -> UnrecognizedEnum<Enum>?,
+            wrapUnrecognized: (UnrecognizedVariant<Enum>) -> Unknown,
+            getUnrecognized: (Unknown) -> UnrecognizedVariant<Enum>?,
         ) = EnumSerializer(
             recordId,
             doc,
@@ -43,7 +43,7 @@ class EnumSerializer<Enum : Any> private constructor(
                 UnknownVariant(
                     unknownInstance,
                     wrapUnrecognized,
-                    getUnrecognized as (Enum) -> UnrecognizedEnum<Enum>?,
+                    getUnrecognized as (Enum) -> UnrecognizedVariant<Enum>?,
                 ),
         )
     }
@@ -114,8 +114,8 @@ class EnumSerializer<Enum : Any> private constructor(
 
     private class UnknownVariant<Enum : Any>(
         override val constant: Enum,
-        val wrapUnrecognized: (UnrecognizedEnum<Enum>) -> Enum,
-        private val getUnrecognized: (Enum) -> UnrecognizedEnum<Enum>?,
+        val wrapUnrecognized: (UnrecognizedVariant<Enum>) -> Enum,
+        private val getUnrecognized: (Enum) -> UnrecognizedVariant<Enum>?,
     ) : Variant<Enum>(), EnumConstantField.Reflective<Enum> {
         override val kindOrdinal = 0
         override val number get() = 0
@@ -334,7 +334,7 @@ class EnumSerializer<Enum : Any> private constructor(
                     is WrapperVariant<Enum, *> -> throw IllegalArgumentException("${variant.number} refers to a wrapper variant")
                     null ->
                         if (keepUnrecognizedValues && number != null) {
-                            unknown.wrapUnrecognized(UnrecognizedEnum(json))
+                            unknown.wrapUnrecognized(UnrecognizedVariant(json))
                         } else {
                             unknown.constant
                         }
@@ -360,7 +360,7 @@ class EnumSerializer<Enum : Any> private constructor(
                     }
                     null ->
                         if (keepUnrecognizedValues && number != null) {
-                            unknown.wrapUnrecognized(UnrecognizedEnum(json))
+                            unknown.wrapUnrecognized(UnrecognizedVariant(json))
                         } else {
                             unknown.constant
                         }
@@ -403,7 +403,7 @@ class EnumSerializer<Enum : Any> private constructor(
                     if (keepUnrecognizedValues) {
                         val bytes = Buffer()
                         encodeInt32(number, bytes)
-                        unknown.wrapUnrecognized(UnrecognizedEnum(bytes.readByteString()))
+                        unknown.wrapUnrecognized(UnrecognizedVariant(bytes.readByteString()))
                     } else {
                         unknown.constant
                     }
@@ -435,7 +435,7 @@ class EnumSerializer<Enum : Any> private constructor(
                         val peekBuffer = buffer.peek()
                         val byteCount = decodeUnused(peekBuffer)
                         unrecognizedBytes.write(buffer.readByteString(byteCount))
-                        unknown.wrapUnrecognized(UnrecognizedEnum(unrecognizedBytes.readByteString()))
+                        unknown.wrapUnrecognized(UnrecognizedVariant(unrecognizedBytes.readByteString()))
                     } else {
                         decodeUnused(buffer)
                         unknown.constant

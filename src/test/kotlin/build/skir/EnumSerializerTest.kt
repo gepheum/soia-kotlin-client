@@ -1,7 +1,7 @@
 package build.skir
 
 import build.skir.internal.EnumSerializer
-import build.skir.internal.UnrecognizedEnum
+import build.skir.internal.UnrecognizedVariant
 import build.skir.internal.toStringImpl
 import build.skir.reflection.parseTypeDescriptorImpl
 import com.google.common.truth.Truth.assertThat
@@ -16,7 +16,7 @@ class EnumSerializerTest {
     sealed class Color {
         abstract val kindOrdinal: Int
 
-        data class Unknown(val unrecognized: UnrecognizedEnum<Color>?) : Color() {
+        data class Unknown(val unrecognized: UnrecognizedVariant<Color>?) : Color() {
             override val kindOrdinal = 0
         }
 
@@ -44,7 +44,7 @@ class EnumSerializerTest {
     sealed class Status {
         abstract val kindOrdinal: Int
 
-        data class Unknown(val unrecognized: UnrecognizedEnum<Status>) : Status() {
+        data class Unknown(val unrecognized: UnrecognizedVariant<Status>) : Status() {
             override val kindOrdinal = 0
         }
 
@@ -90,7 +90,7 @@ class EnumSerializerTest {
             doc = "A status",
             { it.kindOrdinal },
             4,
-            Status.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
+            Status.Unknown(UnrecognizedVariant(JsonPrimitive(0))),
             { unrecognized -> Status.Unknown(unrecognized) },
             { enum -> enum.unrecognized },
         ).apply {
@@ -221,7 +221,7 @@ class EnumSerializerTest {
     fun `test enum serializer - default detection`() {
         // Test isDefault
         assertThat(colorEnumSerializer.isDefault(Color.UNKNOWN)).isTrue()
-        assertThat(colorEnumSerializer.isDefault(Color.Unknown(UnrecognizedEnum(JsonPrimitive(0))))).isFalse()
+        assertThat(colorEnumSerializer.isDefault(Color.Unknown(UnrecognizedVariant(JsonPrimitive(0))))).isFalse()
         assertThat(colorEnumSerializer.isDefault(Color.RED)).isFalse()
         assertThat(colorEnumSerializer.isDefault(Color.CustomOption(123))).isFalse()
     }
@@ -352,7 +352,7 @@ class EnumSerializerTest {
                 "",
                 { it.kindOrdinal },
                 4,
-                Color.Unknown(UnrecognizedEnum(JsonPrimitive(0))),
+                Color.Unknown(UnrecognizedVariant(JsonPrimitive(0))),
                 { unrecognized -> Color.Unknown(unrecognized) },
                 { enum -> enum.unrecognized },
             )
