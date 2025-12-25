@@ -21,4 +21,6 @@ class Method<Request, Response>(
     val requestSerializer: Serializer<Request>,
     @get:JvmName("responseSerializer")
     val responseSerializer: Serializer<Response>,
+    @get:JvmName("doc")
+    val doc: String,
 )

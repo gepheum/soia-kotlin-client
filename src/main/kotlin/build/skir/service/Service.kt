@@ -2,6 +2,7 @@ package build.skir.service
 
 import build.skir.JsonFlavor
 import build.skir.UnrecognizedValuesPolicy
+import build.skir.internal.JsonObjectBuilder
 import build.skir.internal.formatReadableJson
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -116,14 +117,13 @@ class Service private constructor(private val impl: Impl<*>) {
                 val methodsData =
                     JsonArray(
                         methodImpls.values.map { methodImpl ->
-                            JsonObject(
-                                mapOf(
-                                    "method" to JsonPrimitive(methodImpl.method.name),
-                                    "number" to JsonPrimitive(methodImpl.method.number),
-                                    "request" to methodImpl.method.requestSerializer.typeDescriptor.asJson(),
-                                    "response" to methodImpl.method.responseSerializer.typeDescriptor.asJson(),
-                                ),
-                            )
+                            JsonObjectBuilder()
+                                .put("method", JsonPrimitive(methodImpl.method.name))
+                                .put("number", JsonPrimitive(methodImpl.method.number))
+                                .put("request", methodImpl.method.requestSerializer.typeDescriptor.asJson())
+                                .put("response", methodImpl.method.responseSerializer.typeDescriptor.asJson())
+                                .putUnlessEmpty("doc", JsonPrimitive(methodImpl.method.doc))
+                                .build()
                         },
                     )
                 val json = JsonObject(mapOf("methods" to methodsData))
