@@ -54,7 +54,7 @@ mavenPublishing {
     // Define coordinates for the published artifact
     coordinates(
         groupId = "build.skir",
-        artifactId = "skir-kotlin-client",
+        artifactId = "skir-client",
         version = "0.0.1",
     )
 
