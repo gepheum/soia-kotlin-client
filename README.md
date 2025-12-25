@@ -1,9 +1,9 @@
-[![Maven Central](https://img.shields.io/maven-central/v/land.soia/soia-kotlin-client)](https://central.sonatype.com/artifact/land.soia/soia-kotlin-client)
-[![build](https://github.com/gepheum/soia-kotlin-client/workflows/Build/badge.svg)](https://github.com/gepheum/soia-kotlin-client/actions)
+[![Maven Central](https://img.shields.io/maven-central/v/build.skir/skir-kotlin-client)](https://central.sonatype.com/artifact/build.skir/skir-kotlin-client)
+[![build](https://github.com/gepheum/skir-kotlin-client/workflows/Build/badge.svg)](https://github.com/gepheum/skir-kotlin-client/actions)
 
-# Soia Kotlin Client
+# Skir Kotlin Client
 
-Library imported from Kotlin and Java code generated from soia files.
+Library imported from Kotlin and Java code generated from skir files.
 
 ## Installation
 
@@ -11,7 +11,7 @@ Library imported from Kotlin and Java code generated from soia files.
 
 ```kotlin
 dependencies {
-    implementation("land.soia:soia-kotlin-client:1.1.4")  // Pick the latest version
+    implementation("build.skir:skir-kotlin-client:1.1.4")  // Pick the latest version
 }
 ```
 
@@ -19,7 +19,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'land.soia:soia-kotlin-client:1.1.4'  // Pick the latest version
+    implementation 'build.skir:skir-kotlin-client:1.1.4'  // Pick the latest version
 }
 ```
 
@@ -27,8 +27,8 @@ dependencies {
 
 ```xml
 <dependency>
-    <groupId>land.soia</groupId>
-    <artifactId>soia-kotlin-client</artifactId>
+    <groupId>build.skir</groupId>
+    <artifactId>skir-kotlin-client</artifactId>
     <version>1.1.4</version>
 </dependency>
 ```
@@ -39,6 +39,6 @@ This library can be used in Java projects as well as Kotlin projects. The genera
 
 ## See Also
 
-*   [soia](https://github.com/gepheum/soia): home of the soia compiler
-*   [soia-kotlin-gen](https://github.com/gepheum/soia-kotlin-gen): soia to Kotlin code generator
-*   [soia-kotlin-example](https://github.com/gepheum/soia-kotlin-example): example showing how to use soia's Kotlin code generator in a project
+*   [skir](https://github.com/gepheum/skir): home of the skir compiler
+*   [skir-kotlin-gen](https://github.com/gepheum/skir-kotlin-gen): skir to Kotlin code generator
+*   [skir-kotlin-example](https://github.com/gepheum/skir-kotlin-example): example showing how to use skir's Kotlin code generator in a project

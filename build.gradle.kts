@@ -7,8 +7,8 @@ plugins {
     id("org.jetbrains.dokka") version "1.9.10"
 }
 
-group = "land.soia"
-version = "1.1.4"
+group = "build.skir"
+version = "0.0.1"
 
 kotlin {
     compilerOptions {
@@ -53,17 +53,17 @@ tasks.register("generateDocs") {
 mavenPublishing {
     // Define coordinates for the published artifact
     coordinates(
-        groupId = "land.soia",
-        artifactId = "soia-kotlin-client",
-        version = "1.1.4",
+        groupId = "build.skir",
+        artifactId = "skir-kotlin-client",
+        version = "0.0.1",
     )
 
     // Configure POM metadata for the published artifact
     pom {
-        name.set("Soia Kotlin Client")
-        description.set("Soia Client for the Kotlin Language")
+        name.set("Skir Kotlin Client")
+        description.set("Skir Client for the Kotlin Language")
         inceptionYear.set("2025")
-        url.set("https://github.com/gepheum/soia-kotlin-client")
+        url.set("https://github.com/gepheum/skir-kotlin-client")
 
         licenses {
             license {
@@ -83,7 +83,7 @@ mavenPublishing {
 
         // Specify SCM information
         scm {
-            url.set("https://github.com/gepheum/soia-kotlin-client")
+            url.set("https://github.com/gepheum/skir-kotlin-client")
         }
     }
 
