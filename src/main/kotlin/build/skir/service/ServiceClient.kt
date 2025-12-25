@@ -1,6 +1,6 @@
 package build.skir.service
 
-import build.skir.UnrecognizedFieldsPolicy
+import build.skir.UnrecognizedValuesPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -59,7 +59,7 @@ class ServiceClient(
 
             if (httpResponse.statusCode() in 200..299) {
                 val jsonCode = httpResponse.body()
-                method.responseSerializer.fromJsonCode(jsonCode, UnrecognizedFieldsPolicy.KEEP)
+                method.responseSerializer.fromJsonCode(jsonCode, UnrecognizedValuesPolicy.KEEP)
             } else {
                 var message = ""
                 val contentType = httpResponse.headers().firstValue("content-type").orElse("")

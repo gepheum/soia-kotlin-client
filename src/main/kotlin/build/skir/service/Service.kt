@@ -1,7 +1,7 @@
 package build.skir.service
 
 import build.skir.JsonFlavor
-import build.skir.UnrecognizedFieldsPolicy
+import build.skir.UnrecognizedValuesPolicy
 import build.skir.internal.formatReadableJson
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -20,15 +20,15 @@ class Service private constructor(private val impl: Impl<*>) {
      * request's body. The query string is the part of the URL after '?', and it
      * can be decoded with DecodeURIComponent.
      *
-     * Pass in "keep-unrecognized-fields" if the request cannot come from a
+     * Pass in [UnrecognizedValuesPolicy.KEEP] if the request cannot come from a
      * malicious user.
      */
     suspend fun handleRequest(
         requestBody: String,
         requestHeaders: HttpHeaders,
-        unrecognizedFields: UnrecognizedFieldsPolicy,
+        unrecognizedValues: UnrecognizedValuesPolicy,
     ): RawResponse {
-        return impl.handleRequest(requestBody, requestHeaders, unrecognizedFields)
+        return impl.handleRequest(requestBody, requestHeaders, unrecognizedValues)
     }
 
     /** Raw response returned by the server. */
@@ -110,7 +110,7 @@ class Service private constructor(private val impl: Impl<*>) {
         suspend fun handleRequest(
             requestBody: String,
             requestHeaders: HttpHeaders,
-            unrecognizedFields: UnrecognizedFieldsPolicy,
+            unrecognizedValues: UnrecognizedValuesPolicy,
         ): RawResponse {
             if (requestBody.isEmpty() || requestBody == "list") {
                 val methodsData =
@@ -268,9 +268,9 @@ class Service private constructor(private val impl: Impl<*>) {
             val req: Any? =
                 try {
                     if (requestDataCode != null) {
-                        methodImpl.method.requestSerializer.fromJsonCode(requestDataCode, unrecognizedFields)
+                        methodImpl.method.requestSerializer.fromJsonCode(requestDataCode, unrecognizedValues)
                     } else {
-                        methodImpl.method.requestSerializer.fromJson(requestDataJson!!, unrecognizedFields)
+                        methodImpl.method.requestSerializer.fromJson(requestDataJson!!, unrecognizedValues)
                     }
                 } catch (e: Exception) {
                     return RawResponse(

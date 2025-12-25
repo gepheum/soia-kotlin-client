@@ -265,12 +265,12 @@ class EnumSerializerTest {
     fun `test enum serializer - unknown values with keep unrecognized - binary`() {
         // Test unknown constant number with keepUnrecognizedValues = true
         val serializer = Serializer(colorEnumSerializer)
-        val unknownConstant = serializer.fromBytes(byteArrayOf(115, 107, 105, 114, 10), UnrecognizedFieldsPolicy.KEEP)
+        val unknownConstant = serializer.fromBytes(byteArrayOf(115, 107, 105, 114, 10), UnrecognizedValuesPolicy.KEEP)
         assertThat(unknownConstant).isInstanceOf(Color.Unknown::class.java)
         val unknownEnum = (unknownConstant as Color.Unknown).unrecognized
         assertThat(unknownEnum?.bytes).isEqualTo(ByteString.of(10))
 
-        val unknownValue = serializer.fromBytes(byteArrayOf(115, 107, 105, 114, -8, 10, 11), UnrecognizedFieldsPolicy.KEEP)
+        val unknownValue = serializer.fromBytes(byteArrayOf(115, 107, 105, 114, -8, 10, 11), UnrecognizedValuesPolicy.KEEP)
         assertThat(unknownValue).isInstanceOf(Color.Unknown::class.java)
         val unknownValueEnum = (unknownValue as Color.Unknown).unrecognized
         assertThat(unknownValueEnum?.bytes).isEqualTo(ByteString.of(-8, 10, 11))

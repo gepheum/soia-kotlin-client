@@ -37,7 +37,7 @@ enum class JsonFlavor {
  * might have been built from more recent source files.
  * Always pick [DROP] if the input JSON or binary string might come from a malicious user.
  */
-enum class UnrecognizedFieldsPolicy {
+enum class UnrecognizedValuesPolicy {
     /**
      * Unrecognized fields found when deserializing a value are dropped.
      * Pick this option if the input JSON or binary string might come from a malicious
@@ -130,7 +130,7 @@ class Serializer<T> internal constructor(
      * @return The deserialized object
      */
     fun fromJsonCode(jsonCode: String): T {
-        return fromJsonCode(jsonCode, UnrecognizedFieldsPolicy.DROP)
+        return fromJsonCode(jsonCode, UnrecognizedValuesPolicy.DROP)
     }
 
     /**
@@ -138,14 +138,14 @@ class Serializer<T> internal constructor(
      * Works with both dense and readable JSON flavors.
      *
      * @param jsonCode The stringified JSON to deserialize
-     * @param unrecognizedFields Whether to keep or drop unrecognized fields
+     * @param unrecognizedValues Whether to keep or drop unrecognized fields and variants
      * @return The deserialized object
      */
     fun fromJsonCode(
         jsonCode: String,
-        unrecognizedFields: UnrecognizedFieldsPolicy,
+        unrecognizedValues: UnrecognizedValuesPolicy,
     ): T {
-        val keepUnrecognizedValues = unrecognizedFields == UnrecognizedFieldsPolicy.KEEP
+        val keepUnrecognizedValues = unrecognizedValues == UnrecognizedValuesPolicy.KEEP
         val jsonElement = Json.Default.decodeFromString(JsonElement.serializer(), jsonCode)
         return this.impl.fromJson(jsonElement, keepUnrecognizedValues = keepUnrecognizedValues)
     }
@@ -159,7 +159,7 @@ class Serializer<T> internal constructor(
      * @return The deserialized object
      */
     fun fromJson(json: JsonElement): T {
-        return fromJson(json, UnrecognizedFieldsPolicy.DROP)
+        return fromJson(json, UnrecognizedValuesPolicy.DROP)
     }
 
     /**
@@ -167,14 +167,14 @@ class Serializer<T> internal constructor(
      * Works with both dense and readable JSON flavors.
      *
      * @param json The JSON element to deserialize
-     * @param unrecognizedFields Whether to keep or drop unrecognized fields
+     * @param unrecognizedValues Whether to keep or drop unrecognized fields and variants
      * @return The deserialized object
      */
     fun fromJson(
         json: JsonElement,
-        unrecognizedFields: UnrecognizedFieldsPolicy,
+        unrecognizedValues: UnrecognizedValuesPolicy,
     ): T {
-        val keepUnrecognizedValues = unrecognizedFields == UnrecognizedFieldsPolicy.KEEP
+        val keepUnrecognizedValues = unrecognizedValues == UnrecognizedValuesPolicy.KEEP
         return this.impl.fromJson(json, keepUnrecognizedValues = keepUnrecognizedValues)
     }
 
@@ -199,23 +199,23 @@ class Serializer<T> internal constructor(
      * @return The deserialized object
      */
     fun fromBytes(bytes: ByteArray): T {
-        return fromBytes(bytes, UnrecognizedFieldsPolicy.DROP)
+        return fromBytes(bytes, UnrecognizedValuesPolicy.DROP)
     }
 
     /**
      * Deserializes an object from its binary representation.
      *
      * @param bytes The byte array containing the serialized data
-     * @param unrecognizedFields Whether to keep or drop unrecognized fields
+     * @param unrecognizedValues Whether to keep or drop unrecognized fields and variants
      * @return The deserialized object
      */
     fun fromBytes(
         bytes: ByteArray,
-        unrecognizedFields: UnrecognizedFieldsPolicy,
+        unrecognizedValues: UnrecognizedValuesPolicy,
     ): T {
         val buffer = Buffer()
         buffer.write(bytes)
-        return this.fromBytes(buffer, unrecognizedFields)
+        return this.fromBytes(buffer, unrecognizedValues)
     }
 
     /**
@@ -226,42 +226,42 @@ class Serializer<T> internal constructor(
      * @return The deserialized object
      */
     fun fromBytes(bytes: ByteString): T {
-        return fromBytes(bytes, UnrecognizedFieldsPolicy.DROP)
+        return fromBytes(bytes, UnrecognizedValuesPolicy.DROP)
     }
 
     /**
      * Deserializes an object from its binary representation.
      *
      * @param bytes The byte string containing the serialized data
-     * @param unrecognizedFields Whether to keep or drop unrecognized fields
+     * @param unrecognizedValues Whether to keep or drop unrecognized fields and variants
      * @return The deserialized object
      */
     fun fromBytes(
         bytes: ByteString,
-        unrecognizedFields: UnrecognizedFieldsPolicy,
+        unrecognizedValues: UnrecognizedValuesPolicy,
     ): T {
         val buffer = Buffer()
         buffer.write(bytes)
-        return this.fromBytes(buffer, unrecognizedFields)
+        return this.fromBytes(buffer, unrecognizedValues)
     }
 
     private fun fromBytes(
         buffer: Buffer,
-        unrecognizedFields: UnrecognizedFieldsPolicy,
+        unrecognizedValues: UnrecognizedValuesPolicy,
     ): T {
         return if (buffer.readByte().toInt() == 's'.code &&
             buffer.readByte().toInt() == 'k'.code &&
             buffer.readByte().toInt() == 'i'.code &&
             buffer.readByte().toInt() == 'r'.code
         ) {
-            val keepUnrecognizedValues = unrecognizedFields == UnrecognizedFieldsPolicy.KEEP
+            val keepUnrecognizedValues = unrecognizedValues == UnrecognizedValuesPolicy.KEEP
             val result = this.impl.decode(buffer, keepUnrecognizedValues = keepUnrecognizedValues)
             if (!buffer.exhausted()) {
                 throw IllegalArgumentException("Extra bytes after deserialization")
             }
             result
         } else {
-            this.fromJsonCode(buffer.readUtf8(), unrecognizedFields)
+            this.fromJsonCode(buffer.readUtf8(), unrecognizedValues)
         }
     }
 
